@@ -10,16 +10,25 @@ Research questions:
 
 ## Build / run
     make check                         # tests + hash uniformity check
-    make build/exp1
+    make coverage                      # line/branch coverage of the tests (100% of src/)
+    make build/exp1 build/exp2 build/exp3
     build/exp1 14 20 10000000 > results/exp1_p14.csv
     python3 exp/plot_exp1.py results/exp1_p14.csv results/exp1_p14.png
+    build/exp2 20 1000000 > results/exp2_n1e6.csv && python3 exp/plot_exp2.py results/exp2_n1e6.csv results/exp2_n1e6.png
+    build/exp4_real data/war_and_peace.txt 20 > results/exp4_real.csv
+    python3 exp/plot_extra.py          # extra figures (how HLL works, hand-over zoom, real data, summary)
+    build/exp3 21 > results/exp3_p14.csv && python3 exp/plot_exp3.py results/exp3_p14.csv results/exp3_p14.png
 
 ## Layout
 - `src/hll.hpp`   HyperLogLog: `estimate_basic()`, `estimate_lc()`, `merge()`, `empty_fraction()`
 - `src/gen.hpp`   input generator (random 64-bit IDs + repeats, true count known by construction)
-- `tests/`        0/1/2 items, register edge cases, merge, generator vs real hash set
+- `tests/`        0/1/2 items, register edge cases, merge, switch rules, worked example, hand-over bias, generator vs real hash set (100% line/branch coverage of `src/`)
 - `tools/hash_check.cpp`  uniformity check for the hash
-- `exp/`          experiment 1 (done), plot script
+- `exp/`          experiments 1-3 and their plot scripts
+- `results/`      CSVs, plots, `FINDINGS.md`
+- `data/`         real dataset (War and Peace, Project Gutenberg) + `SOURCE.txt`
+- `report/`       HTML source of `report.pdf`, script that builds `slides.pptx`
+- `report.pdf`, `slides.pptx`  final report and defense slides (`report/make_slides.py` builds the slides)
 - `third_party/xxHash`    xxHash v0.8.3 (header-only)
 - `proposal.pdf`  final project proposal
 
@@ -39,21 +48,20 @@ All points: 20 seeds, same seeds and inputs for all versions. Report mean with 9
 | # | x-axis | Curves | Fixed | Plot | Status |
 |---|---|---|---|---|---|
 | 1 | true count n (10 .. 10^7, log) | Basic HLL, HLL + LC | p = 14 | mean relative error and spread, empty-register share | done (smoke run, `results/exp1_p14.*`) |
-| 2 | p (4 .. 16) | measured error vs theory 1.04/sqrt(m) | n = 10^6 | spread of error, memory | to do |
-| 3 | true count n | Basic HLL, HLL + LC, hash set | p = 14 | time per item, memory | to do |
+| 2 | p (4 .. 16) | measured error vs theory 1.04/sqrt(m) | n = 10^6 | spread of error, memory | done, `results/exp2_n1e6.*` |
+| 3 | true count n | Basic HLL, HLL + LC, hash set | p = 14 | time per item, memory | done, `results/exp3_p14.*` |
+| 4 (optional) | p = 8..14 | Basic HLL, HLL + LC | real text | error on distinct words of War and Peace | done, `results/exp4_real.csv` |
 
 Metric: relative error (estimate - n) / n. Inputs: random 64-bit IDs with repeats. Exact answer: hash set (`std::unordered_set`).
 
 ## Status
-Done: HLL code, generator, tests, hash decision and check, experiment 1 run and plot.
+Everything in the proposal is done: HLL code, generator, tests (incl. a hand-computed worked example in place of the slide-10 example, whose numbers we do not have), hash check, experiments 1-3, the optional real dataset (exp. 4), `results/FINDINGS.md`, `report.pdf` and `slides.pptx` (with the slide corrections: 12 KB not 1.5 KB; 0.81% not about 2%).
 
-Still to do:
-- Experiment 2 (p = 4..16) and experiment 3 (time, memory, hash set), incl. the hash set baseline and timing harness.
-- Explain the handover region (about 40k-80k items at p=14): both estimators show about +2.4% error at n = 2.5m, because the raw estimate is biased upward near 2.5m and crosses the LC threshold early.
-- Slide 10 example: test has a `TODO` placeholder; we need the slides to copy the exact numbers.
-- Memory: we STORE 1 byte per register (16 KB at p=14); the 12 KB figure assumes packed 6-bit registers (`bytes_packed_6bit()`). Report both, and correct the slides (1.5 KB vs 12 KB, "about 2%" error vs 0.81%).
-- Optional: real dataset (week 4, only if on time).
-- Report and slides.
+Known limits / optional follow-ups:
+- Timings: final run plugged in, other programs closed (an earlier battery run agreed closely).
+- If the original slide 10 differs from our worked example, change the numbers in `test_worked_example()`.
+
+Memory note: we STORE 1 byte per register (16 KB at p=14); the 12 KB figure assumes packed 6-bit registers (`bytes_packed_6bit()`). Both are reported.
 
 ## Schedule (4 weeks)
 | Week | Ibrahim | Nika | Result |

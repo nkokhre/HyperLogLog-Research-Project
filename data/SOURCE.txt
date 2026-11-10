@@ -1,0 +1,1 @@
+War and Peace, Project Gutenberg ebook #2600, https://www.gutenberg.org/cache/epub/2600/pg2600.txt (public domain). Used by exp/exp4_real.cpp: words (lowercase letters/apostrophes) between the START/END markers are the stream items.
