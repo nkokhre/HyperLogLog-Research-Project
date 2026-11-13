@@ -44,19 +44,21 @@ ax[1].text(0, 0.42, "Linear counting", fontsize=14, fontweight="bold", color="#1
 ax[1].text(0, 0.27, "2 of 16 registers empty\nestimate = 16 · ln(16 / 2)\n               = 33.3", fontsize=13, va="top", family="monospace")
 plt.tight_layout(); plt.savefig("results/fig_example.png", dpi=150); plt.close()
 
-# ---------- 3. Small counts: estimate vs true ----------
+# ---------- 3. Small counts: estimate vs perfect answer (2 panels) ----------
 d = pd.read_csv("results/exp1_p14.csv")
 g = d.groupby("n")[["est_basic", "est_lc"]].mean()
-fig, ax = plt.subplots(figsize=(7.5, 5.2))
 ns = g.index.values
-ax.plot(ns, ns, "k--", label="perfect answer")
-ax.plot(ns, g.est_basic, "o-", ms=4, color=BLUE, label="basic HLL")
-ax.plot(ns, g.est_lc, "s-", ms=4, color=ORANGE, label="with linear counting")
-ax.set_xscale("log"); ax.set_yscale("log")
-ax.set_xlabel("real number of different items"); ax.set_ylabel("estimate (mean of 20 runs)")
-ax.set_title("Small counts: basic HLL cannot go below ~12,000")
-ax.annotate("1,000 items → basic says ~12,300", xy=(1000, 12300), xytext=(12, 90000), arrowprops=dict(arrowstyle="->"), fontsize=11)
-ax.legend(loc="lower right")
+fig, ax = plt.subplots(1, 2, figsize=(12, 5), sharey=True)
+for a_, col, c, mk, ttl in [(ax[0], "est_basic", BLUE, "o", "Basic HLL vs perfect answer"),
+                            (ax[1], "est_lc", ORANGE, "s", "Linear counting vs perfect answer")]:
+    a_.plot(ns, ns, "-", color="black", lw=2.2, label="perfect answer", zorder=1)
+    a_.plot(ns, g[col], mk, ms=5, color=c, label=ttl.split(" vs")[0], zorder=2)
+    a_.set_xscale("log"); a_.set_yscale("log")
+    a_.set_xlabel("real number of different items"); a_.set_title(ttl)
+    a_.legend(loc="lower right")
+ax[0].set_ylabel("estimate (mean of 20 runs)")
+ax[0].annotate("1,000 items:\nbasic says ~12,300", xy=(1000, 12300), xytext=(12, 150000), arrowprops=dict(arrowstyle="->"), fontsize=12)
+ax[1].annotate("1,000 items:\nlinear counting says ~1,000", xy=(1000, 1000), xytext=(12, 150000), arrowprops=dict(arrowstyle="->"), fontsize=12)
 plt.tight_layout(); plt.savefig("results/fig_small.png", dpi=150); plt.close()
 
 # ---------- 4. Hand-over zoom ----------
@@ -113,3 +115,28 @@ ax[1].text(1, e.set_ns + 4, f"{e.set_ns:.0f} ns", ha="center", fontweight="bold"
 ax[1].set_ylim(0, 245)
 plt.tight_layout(); plt.savefig("results/fig_summary.png", dpi=150); plt.close()
 print("figures written")
+
+# ---------- 7. Experiment 1, simple version for slides ----------
+d = pd.read_csv("results/exp1_p14.csv")
+d["eb"] = (d.est_basic - d.n) / d.n * 100; d["el"] = (d.est_lc - d.n) / d.n * 100
+gg = d.groupby("n"); ns = gg.eb.mean().index.values
+sw = 2.5 * 16384
+fig, ax = plt.subplots(1, 2, figsize=(13, 5))
+for a_ in ax:
+    a_.axvline(sw, color=GRAY, ls=":", lw=2); a_.set_xscale("log")
+    a_.set_xlabel("real number of different items")
+ax[0].axhline(0, color="k", lw=0.8)
+ax[0].plot(ns, gg.eb.mean(), "o-", ms=4, color=BLUE, label="basic HLL")
+ax[0].plot(ns, gg.el.mean(), "s-", ms=4, color=ORANGE, label="with linear counting")
+ax[0].set_ylim(-6, 30); ax[0].set_ylabel("average error (%)")
+ax[0].set_title("(a) Average error")
+ax[0].annotate("basic HLL is far above the\nchart for small counts\n(+1130% at 1,000 items)", xy=(1.9e4, 24), xytext=(11, 9), arrowprops=dict(arrowstyle="->"), fontsize=12, color=BLUE)
+ax[0].text(sw * 1.15, 13, "dotted line = switch point\n(2.5 × registers = 40,960 items)\nlinear counting is used on the\nleft of it, the basic formula\non the right", fontsize=11, color=GRAY, va="center")
+ax[0].legend(loc="upper right", fontsize=10.5)
+ax[1].plot(ns, gg.eb.std().values, "o-", ms=4, color=BLUE, label="basic HLL")
+ax[1].plot(ns, gg.el.std().values, "s-", ms=4, color=ORANGE, label="with linear counting")
+ax[1].axhline(0.81, color="k", ls="--", label="theory 0.81%")
+ax[1].plot([], [], color=GRAY, ls=":", lw=2, label="switch point (40,960 items)")
+ax[1].set_yscale("log"); ax[1].set_ylim(0.2, 6); ax[1].set_ylabel("spread of the error (%)")
+ax[1].set_title("(b) How much the error varies between runs"); ax[1].legend(loc="upper right")
+plt.tight_layout(); plt.savefig("results/fig_exp1_simple.png", dpi=150); plt.close()

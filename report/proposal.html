@@ -1,0 +1,82 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Project Proposal: HyperLogLog</title>
+<style>
+@page{size:Letter;margin:0.9in 1in}
+body{font-family:Calibri,Carlito,"Helvetica Neue",Arial,sans-serif;font-size:11pt;line-height:1.28;color:#000;margin:0}
+h1{font-weight:400;font-size:26pt;color:#1F3864;margin:0 0 14pt;padding-bottom:3pt;border-bottom:1px solid #4F81BD}
+h2{font-size:13pt;color:#4F81BD;margin:14pt 0 3pt;page-break-after:avoid}
+h3{font-size:11pt;color:#4F81BD;margin:10pt 0 3pt;page-break-after:avoid}
+p{margin:0 0 9pt}
+ol,ul{margin:0 0 9pt;padding-left:26pt}
+ul{list-style:none;padding-left:18pt}
+ul li:before{content:"\2022";position:absolute;margin-left:-14pt}
+li{margin-bottom:2pt}
+table{border-collapse:collapse;width:100%;margin:4pt 0 9pt;font-size:10pt;page-break-inside:avoid}
+th,td{border:1px solid #888;padding:3pt 5pt;vertical-align:top;text-align:left}
+th{background:#DCE6F2}
+</style></head><body>
+<h1>Project Proposal: HyperLogLog</h1>
+<p>Ibrahim and Nika · Advanced Algorithms &amp; Data Structures, Fall 2026 · 20 October 2026</p>
+
+<h2>1. Team and topic</h2>
+<p>We are Ibrahim and Nika, and our topic is HyperLogLog, the algorithm from our student seminar. It estimates how many different items are in a huge stream while using only a few kilobytes of memory. In this project we want to test how accurate it really is, and where it stops being accurate.</p>
+
+<h2>2. Idea and research questions</h2>
+<p>In the seminar we saw that HyperLogLog is very good for large counts, but that the basic version has trouble with small ones. We would like to see this ourselves and find out whether the fix is worth it.</p>
+<p>Our research questions:</p>
+<ol>
+<li>How does the error of HyperLogLog change with the true number of distinct items, and does linear counting (the small-count fix) remove the error for small counts?</li>
+<li>How does the number of registers change the error, compared with the theory value 1.04/√m?</li>
+</ol>
+<h3>What we expect</h3>
+<p>For large counts, the theory says the standard error is about 1.04/√m, where m is the number of registers. For 16,384 registers that is 0.81%. We expect to measure roughly this, and it should not depend on how many items we count.</p>
+<p>For small counts we expect trouble. With 16,384 registers and only 1,000 items, almost every register is still empty, so the basic formula should give about 0.72 · 16,384 ≈ 11,800. That is around 12 times too big. Linear counting looks at how many registers are empty instead, and we expect it to be off by only about 1%.</p>
+<p>Linear counting only changes the last step, not the update, so we do not expect it to make the algorithm slower.</p>
+<p>We are not sure what happens between about 40,000 and 80,000 items, where the two formulas hand over to each other. If the error there is strange, we will report it and try to explain it.</p>
+<p>One more thing: our slides say 1.5 KB in one place and 12 KB in another, and give a typical error of about 2%. With 16,384 registers of 6 bits the memory is 12 KB, and the error is 0.81%. We will check these numbers in the project and correct the slides if needed.</p>
+
+<h2>3. Implementation</h2>
+<p>We will write HyperLogLog ourselves, because we need to see the registers and count the empty ones. We write it in C++, because we both know it well and the leading-zero count is a single built-in instruction there.</p>
+<ul>
+<li>Two versions in the same code: the basic estimator, and the basic estimator with linear counting when the estimate is at most 2.5m and some registers are empty.</li>
+<li>A 64-bit hash from an existing library: we use XXH3-64 from xxHash (header-only). The first p bits choose the register, the rest give the leading zeros.</li>
+<li>The number of registers is 2<sup>p</sup>. We use p = 14 by default and try p from 4 to 16.</li>
+<li>Small tests to be sure it works: the example from slide 10, a count of 0, 1 and 2 items, and a check that merging two sketches gives the same result as one sketch of all items.</li>
+</ul>
+
+<h2>4. Evaluation plan</h2>
+<p>We keep the plan small on purpose, so that we can finish it well in four weeks.</p>
+<h3>What we compare with</h3>
+<p>The baseline is the basic HyperLogLog from the seminar. The exact answer comes from a normal hash set (<code style="font-family:inherit">std::unordered_set</code> of 64-bit IDs), which also shows how much memory HyperLogLog saves.</p>
+<h3>What we measure</h3>
+<p>The main metric is the relative error, (estimate − true count) / true count. To see what we lose, we also measure the time per inserted item and the memory. For memory we report both what our code stores (1 byte per register) and the packed 6-bit size that the theory counts. To explain the error at small counts, we record the share of empty registers.</p>
+<h3>Inputs</h3>
+<p>We use random 64-bit IDs, with some of them repeated. The true count n goes from 10 to 10<sup>7</sup> on a log scale. If time remains in week 4, we add one real dataset: a public text file (for example a book from Project Gutenberg), where the IDs are the words and the true number of different words is counted with the hash set. It is an optional extra and the first thing we drop.</p>
+<h3>Experiments</h3>
+<table>
+<tr><th>#</th><th>On the x-axis</th><th>Curves</th><th>Fixed</th><th>What we plot</th></tr>
+<tr><td>1</td><td>True count n</td><td>Basic HLL, HLL with linear counting</td><td>p = 14</td><td>Mean relative error and its spread</td></tr>
+<tr><td>2</td><td>Number of registers (p)</td><td>Measured error, theory 1.04/√m</td><td>n = 10<sup>6</sup></td><td>Spread of the error, and memory</td></tr>
+<tr><td>3</td><td>True count n</td><td>Basic HLL, HLL with linear counting, hash set</td><td>p = 14</td><td>Time per item and memory</td></tr>
+</table>
+<h3>Randomness and timing</h3>
+<p>Every point is repeated with 20 random seeds, and all versions get the same seeds and inputs. We look at the distribution of the errors first, then report the mean with a 95% confidence interval and say on the plots what the error bars show. For the timing in experiment 3 we use a small benchmark harness of our own (Google Benchmark is not installed and we do not want to spend time on setting it up). It does a warm-up run, repeats each measurement several times and reports the median and the spread; we build the keys outside the measured code, and we use every result so the compiler cannot remove the work. All runs are on one machine that is plugged in, with other programs closed.</p>
+
+<h2>5. Schedule</h2>
+<p>We have four weeks between the proposal and the defense. After the review we update this proposal within a few days.</p>
+<table>
+<tr><th>Week</th><th>Ibrahim</th><th>Nika</th><th>Result</th></tr>
+<tr><td>1</td><td>Hash set baseline, input generator</td><td>HyperLogLog code and tests</td><td>Working code, TBDs decided</td></tr>
+<tr><td>2</td><td>Timing setup for experiment 3</td><td>Experiments 1 and 2</td><td>First plots</td></tr>
+<tr><td>3</td><td>Experiment 3, memory</td><td>Compare results with our predictions</td><td>All main plots, list of surprises</td></tr>
+<tr><td>4</td><td>Real dataset if we are on time</td><td>Report and slides together</td><td>Ready for the defense</td></tr>
+</table>
+<p>If we fall behind, the real dataset is the first thing we drop.</p>
+
+<h2>Decisions (these were open before)</h2>
+<ul>
+<li><b>Language and benchmark tool:</b> C++ and our own small timing harness (see sections 3 and 4).</li>
+<li><b>Hash library:</b> XXH3-64 from xxHash. It looked uniform on 10<sup>6</sup> random keys and also on 10<sup>6</sup> sequential keys (chi-square of the register buckets, distribution of the leading zeros, and balance of all 64 bits).</li>
+<li><b>Real dataset:</b> optional, one public word list as described in section 4; skipped if there is no time.</li>
+<li><b>Number of seeds:</b> 20. A first test run gave a spread of 0.79% at large counts against 0.81% in theory, so the intervals are narrow enough. We only add seeds if the intervals in the final plots turn out too wide.</li>
+</ul>
+</body></html>

@@ -5,7 +5,7 @@ Advanced Algorithms & Data Structures, Fall 2026. Full plan: `proposal.pdf` (fin
 We implement HyperLogLog (HLL) from scratch and measure how accurate it is and where it stops being accurate.
 
 Research questions:
-1. How does the error change with the true count n, and does linear counting (LC, the small-count fix from HyperLogLog++) remove the error for small counts?
+1. How does the error change with the true count n, and does linear counting (LC, the small-count fix) remove the error for small counts?
 2. How does the number of registers (2^p) change the error, compared with the theory value 1.04/sqrt(m)?
 
 ## Build / run
@@ -27,9 +27,9 @@ Research questions:
 - `exp/`          experiments 1-3 and their plot scripts
 - `results/`      CSVs, plots, `FINDINGS.md`
 - `data/`         real dataset (War and Peace, Project Gutenberg) + `SOURCE.txt`
-- `report/`       HTML source of `report.pdf`, script that builds `slides.pptx`
+- `report/`       HTML sources of `proposal.pdf` and `report.pdf`, script that builds `slides.pptx`
 - `report.pdf`, `slides.pptx`  final report and defense slides (`report/make_slides.py` builds the slides)
-- `third_party/xxHash`    xxHash v0.8.3 (header-only)
+- `third_party/xxHash`    only `xxhash.h` + license of xxHash v0.8.3 (header-only)
 - `proposal.pdf`  final project proposal
 
 ## Decisions (all former TBDs are decided in the proposal)

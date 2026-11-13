@@ -128,15 +128,20 @@ bullets(s, [
 
 # 7 Small counts
 s = new("Small counts: basic HLL cannot go below ~12,000")
-y = picture(s, "fig_small.png", y=1.45, max_w=8.0, max_h=4.6, left=0.7)
-text(s, 9.0, 2.0, 3.8, 3.5, "Even for 10 items, basic HLL says about 12,000.\n\nLinear counting follows the real count.", 20)
+y = picture(s, "fig_small.png", y=1.45, max_w=12.0, max_h=4.3)
+bullets(s, [
+    "Black line = the perfect answer. Left: basic HLL is far above it for small counts.",
+    "Right: linear counting sits exactly on the perfect line.",
+], y=y + 0.1, size=20, gap=6)
 
 # 8 Exp1
 s = new("Experiment 1: error vs real count (p = 14)")
-y = picture(s, "exp1_p14.png", y=1.5, max_w=12.2, max_h=3.6)
-text(s, 0.7, y + 0.15, 11.9, 1.4,
-     "Blue = basic. Orange = with linear counting. Left: mean error. Middle: spread of the error (dashed line = theory 0.81%). "
-     "Right: share of empty registers.", 18, color=GRAY)
+y = picture(s, "fig_exp1_simple.png", y=1.45, max_w=12.2, max_h=4.2)
+bullets(s, [
+    "Left: the average error. With linear counting (orange) it stays near 0 for every count.",
+    "Dotted line = switch point at 40,960 items. Left of it we use linear counting, right of it the basic formula.",
+    "Right: how much the error varies between runs. Large counts: about 0.8%, as the theory says.",
+], y=y + 0.1, size=17, gap=4)
 
 # 9 Exp1 results
 s = new("Experiment 1: results")
@@ -162,7 +167,7 @@ bullets(s, [
     [("2. ", True), ("We switch to linear counting when the estimate is at most 2.5m.", False)],
     [("3. ", True), ("The estimate is too high, so it passes 2.5m a bit early.", False)],
     [("4. ", True), ("Linear counting is turned off while the bias is still there.", False)],
-    "HLL++ fixes this with a correction table. We only report it.",
+    "We report this effect and do not try to correct it.",
     "Our tests also check that this bias is real.",
 ], size=22, gap=10)
 
@@ -213,7 +218,7 @@ s = new("Limits")
 bullets(s, [
     "20 runs per point: spread values are uncertain by about ±16%.",
     "Timings: one laptop, plugged in. Ratios matter more than exact ns.",
-    "No HLL++ correction table and no sparse mode.",
+    "We did not try to correct the small bias around 2.5m.",
     "All code, data and plots are in the project folder; the README shows how to rerun them.",
 ])
 

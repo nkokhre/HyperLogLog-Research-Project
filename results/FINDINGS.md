@@ -10,7 +10,7 @@
   the raw estimate is biased up, it already exceeds 2.5m when the true n is about 2.5m, so LC is switched off while the
   bias is still there (lc_used_share drops from 1.00 at n/m=2.19 to 0.00 at n/m=2.50). Just below, LC is unbiased
   (-0.13% at 2.19m). A jump of about +2.4% appears at the switch, roughly 3 standard deviations of the 0.8% noise.
-  HyperLogLog++ fixes this range with an empirical bias-correction table; we do not.
+  We describe this effect but do not correct it.
 
 ## Exp 2 - error vs p, n=10^6 (results/exp2_n1e6.*)
 - Measured sd follows 1.04/sqrt(m): ratio measured/theory is 0.64-1.12 for p=4..16 (p=14: 0.865% vs 0.812%, ratio 1.07);
