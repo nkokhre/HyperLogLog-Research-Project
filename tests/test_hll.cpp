@@ -222,6 +222,51 @@ static void test_handover_bias_is_real() {
   CHECK(mean > 0.005 && mean < 0.06, "mean basic error is positive (between 0.5% and 6%)");
 }
 
+// ---- switch rules (crossover study) ----
+static HyperLogLog worked_sketch() {  // the p=4 hand-made sketch: raw 23.1648, V = 2
+  const int rho[16] = {1, 1, 2, 1, 3, 1, 1, 2, 1, 1, 1, 2, 1, 4, 0, 0};
+  HyperLogLog h(4);
+  for (int i = 0; i < 16; ++i)
+    if (rho[i] > 0) h.add_hash(make_hash(4, i, rho[i] - 1));
+  return h;
+}
+
+static void test_switch_rules() {
+  std::puts("switch rules: lc_value, pure LC, threshold rules");
+  CHECK(std::fabs(HyperLogLog::lc_value(16, 2) - 16 * std::log(8.0)) < 1e-12, "lc_value(16, 2) = 16 ln 8");
+  CHECK(std::fabs(HyperLogLog::lc_value(16, 0) - 16 * std::log(16.0)) < 1e-12, "lc_value with V=0 clamps V to 1 (m ln m)");
+  CHECK(HyperLogLog::lc_value(16, 16) == 0.0, "lc_value with all registers empty is 0");
+  CHECK(HyperLogLog(10).estimate_lc_only() == 0.0, "pure LC of an empty sketch is 0");
+  HyperLogLog h = worked_sketch();
+  CHECK(std::fabs(h.estimate_lc_only() - 33.2711) < 1e-3, "pure LC on the worked example = 33.2711");
+  {  // sketch with no empty register: pure LC is capped at m ln m
+    HyperLogLog f(4);
+    for (int i = 0; i < 16; ++i) f.add_hash(make_hash(4, i, 0));
+    CHECK(std::fabs(f.estimate_lc_only() - 16 * std::log(16.0)) < 1e-9, "pure LC with no empty register = m ln m");
+    CHECK(f.estimate_switch(100.0) == f.estimate_basic(), "V = 0: threshold rule keeps raw even for a huge c");
+    CHECK(f.estimate_switch_empty(0.0) == f.estimate_basic(), "V = 0: empty-share rule keeps raw");
+  }
+  // threshold rule on the raw estimate E = 23.1648 (m = 16, so E/m = 1.4478)
+  CHECK(std::fabs(h.estimate_switch(1.45) - h.estimate_lc_only()) < 1e-12, "c = 1.45 (E <= 23.2): LC");
+  CHECK(std::fabs(h.estimate_switch(1.44) - h.estimate_basic()) < 1e-12, "c = 1.44 (E > 23.04): raw");
+  CHECK(h.estimate_switch(0.0) == h.estimate_basic(), "c = 0: always raw");
+  CHECK(h.estimate_switch(2.5) == h.estimate_lc(), "c = 2.5 equals the textbook estimate_lc()");
+  {  // c = 2.5 equals estimate_lc() on larger random sketches (both sides of the threshold)
+    bool same = true;
+    for (uint64_t n : {100ULL, 20000ULL, 60000ULL, 200000ULL}) {
+      HyperLogLog r(12);
+      for (uint64_t k = 0; k < n; ++k) r.add(splitmix_mix(k), 3);
+      same = same && (r.estimate_switch(2.5) == r.estimate_lc());
+    }
+    CHECK(same, "c = 2.5 matches estimate_lc() for n = 100 .. 200000");
+  }
+  // empty-share rule: V/m = 2/16 = 0.125
+  CHECK(std::fabs(h.estimate_switch_empty(0.124) - h.estimate_lc_only()) < 1e-12, "empty share 0.125 > f = 0.124: LC");
+  CHECK(h.estimate_switch_empty(0.125) == h.estimate_basic(), "empty share == f: raw (LC only when strictly more empty)");
+  CHECK(h.estimate_switch_empty(1.0) == h.estimate_basic(), "f = 1: always raw");
+  CHECK(std::fabs(h.estimate_switch_empty(0.0) - h.estimate_lc_only()) < 1e-12, "f = 0 with empty registers: LC");
+}
+
 int main() {
   test_register_update();
   test_construction_and_helpers();
@@ -229,6 +274,7 @@ int main() {
   test_lc_switch_rules();
   test_determinism_and_order();
   test_worked_example();
+  test_switch_rules();
   test_tiny_counts();
   test_merge();
   test_generator();

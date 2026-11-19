@@ -2,7 +2,7 @@ CXX ?= g++
 CXXFLAGS ?= -O2 -std=c++17 -Wall -Wextra
 BIN = build
 
-all: $(BIN)/test_hll $(BIN)/hash_check $(BIN)/exp1 $(BIN)/exp2 $(BIN)/exp3 $(BIN)/exp4_real
+all: $(BIN)/test_hll $(BIN)/hash_check $(BIN)/exp1 $(BIN)/exp2 $(BIN)/exp3 $(BIN)/exp4_real $(BIN)/exp5_crossover $(BIN)/exp6_real_crossover
 
 $(BIN):
 	mkdir -p $(BIN)
@@ -19,9 +19,16 @@ $(BIN)/exp3: exp/exp3.cpp src/*.hpp | $(BIN)
 	$(CXX) $(CXXFLAGS) -O3 $< -o $@
 $(BIN)/exp4_real: exp/exp4_real.cpp src/*.hpp | $(BIN)
 	$(CXX) $(CXXFLAGS) -O3 $< -o $@
+$(BIN)/exp5_crossover: exp/exp5_crossover.cpp src/*.hpp | $(BIN)
+	$(CXX) $(CXXFLAGS) -O3 $< -o $@
+$(BIN)/exp6_real_crossover: exp/exp6_real_crossover.cpp src/*.hpp | $(BIN)
+	$(CXX) $(CXXFLAGS) -O3 $< -o $@
 
 check: $(BIN)/test_hll $(BIN)/hash_check
 	$(BIN)/test_hll && $(BIN)/hash_check
+
+check-analysis:
+	python3 tests/test_analysis.py
 
 coverage: tests/test_hll.cpp src/*.hpp | $(BIN)
 	clang++ -std=c++17 -O0 -fprofile-instr-generate -fcoverage-mapping $< -o $(BIN)/test_cov
@@ -31,4 +38,11 @@ coverage: tests/test_hll.cpp src/*.hpp | $(BIN)
 
 clean:
 	rm -rf $(BIN)
-.PHONY: all check coverage clean
+.PHONY: all check check-analysis coverage clean exp5-run
+
+# Main experiment (crossover). Raw data -> analysis -> plots.
+exp5-run: $(BIN)/exp5_crossover $(BIN)/exp6_real_crossover
+	$(BIN)/exp5_crossover 500 8,10,12,14,16 | gzip -9 > results/exp5_raw.csv.gz
+	$(BIN)/exp6_real_crossover data/war_and_peace.txt 200 8,10,12 | gzip -9 > results/exp6_real_raw.csv.gz
+	python3 exp/analyze_exp5.py
+	python3 exp/plot_exp5.py

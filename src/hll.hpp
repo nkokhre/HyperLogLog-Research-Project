@@ -4,7 +4,9 @@
 // last step (the estimate), never the update:
 //   estimate_basic() - raw HyperLogLog formula (the seminar baseline)
 //   estimate_lc()    - raw formula, but linear counting when raw <= 2.5 m
-//                      and at least one register is empty
+//                      and at least one register is empty (textbook rule)
+//   estimate_lc_only(), estimate_switch(c), estimate_switch_empty(f) -
+//                      pure LC and configurable switch rules (crossover study)
 #pragma once
 #include <algorithm>
 #include <cmath>
@@ -63,15 +65,37 @@ class HyperLogLog {
     return alpha() * double(m_) * double(m_) / sum;
   }
 
-  // Basic estimate, switched to linear counting m*ln(m/V) for small counts.
-  double estimate_lc() const {
+  // Linear counting m*ln(m/V) for V empty registers. V is clamped to >= 1 so
+  // the formula is defined (and capped at m*ln(m)) when no register is empty.
+  static double lc_value(uint32_t m, uint32_t empty) {
+    const uint32_t v = empty > 0 ? empty : 1;
+    return double(m) * std::log(double(m) / double(v));
+  }
+
+  // Pure linear counting: always uses the empty-register formula.
+  double estimate_lc_only() const { return lc_value(m_, empty_registers()); }
+
+  // Switch rule on the raw estimate E: linear counting if E <= c*m and at
+  // least one register is empty, otherwise the raw estimate.
+  double estimate_switch(double c) const {
     const double e = estimate_basic();
-    if (e <= 2.5 * m_) {
+    if (e <= c * m_) {
       const uint32_t v = empty_registers();
-      if (v > 0) return double(m_) * std::log(double(m_) / double(v));
+      if (v > 0) return lc_value(m_, v);
     }
     return e;
   }
+
+  // Switch rule on the share of empty registers: linear counting while more
+  // than a share f of the registers are empty, otherwise the raw estimate.
+  double estimate_switch_empty(double f) const {
+    const uint32_t v = empty_registers();
+    if (v > 0 && double(v) / m_ > f) return lc_value(m_, v);
+    return estimate_basic();
+  }
+
+  // The textbook rule: switch at E <= 2.5 m (our baseline "HLL + LC").
+  double estimate_lc() const { return estimate_switch(2.5); }
 
   // Theory value for the standard error: 1.04 / sqrt(m).
   double theory_std_error() const { return 1.04 / std::sqrt(double(m_)); }
