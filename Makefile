@@ -38,11 +38,25 @@ coverage: tests/test_hll.cpp src/*.hpp | $(BIN)
 
 clean:
 	rm -rf $(BIN)
-.PHONY: all check check-analysis coverage clean exp5-run
+.PHONY: all check check-analysis coverage clean exp5-run plots slides pdfs
 
-# Main experiment (crossover). Raw data -> analysis -> plots.
+# Main experiment (crossover): raw data -> analysis -> plots -> slides.  Takes ~1 minute.
 exp5-run: $(BIN)/exp5_crossover $(BIN)/exp6_real_crossover
-	$(BIN)/exp5_crossover 500 8,10,12,14,16 | gzip -9 > results/exp5_raw.csv.gz
-	$(BIN)/exp6_real_crossover data/war_and_peace.txt 200 8,10,12 | gzip -9 > results/exp6_real_raw.csv.gz
+	$(BIN)/exp5_crossover 500 8,10,12,14,16 | gzip -9n > results/exp5_raw.csv.gz
+	$(BIN)/exp6_real_crossover data/war_and_peace.txt 200 8,10,12 | gzip -9n > results/exp6_real_raw.csv.gz
 	python3 exp/analyze_exp5.py
+	$(MAKE) plots slides
+
+plots:
 	python3 exp/plot_exp5.py
+	python3 exp/plot_schematics.py
+	python3 exp/plot_extra.py
+
+slides:
+	python3 report/make_slides.py
+
+# PDFs from the HTML sources (needs Google Chrome; set CHROME=... on other systems)
+CHROME ?= /Applications/Google Chrome.app/Contents/MacOS/Google Chrome
+pdfs:
+	"$(CHROME)" --headless=new --disable-gpu --allow-file-access-from-files --no-pdf-header-footer --print-to-pdf="$(CURDIR)/report.pdf" "file://$(CURDIR)/report/report.html"
+	"$(CHROME)" --headless=new --disable-gpu --no-pdf-header-footer --print-to-pdf="$(CURDIR)/proposal.pdf" "file://$(CURDIR)/report/proposal.html"
