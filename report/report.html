@@ -1,102 +1,123 @@
-<!doctype html><html><head><meta charset="utf-8"><title>HyperLogLog accuracy report</title>
+<!doctype html><html><head><meta charset="utf-8"><title>When does linear counting stop helping HyperLogLog?</title>
 <style>
-@page{size:Letter;margin:0.8in 0.9in}
-body{font-family:Calibri,Carlito,"Helvetica Neue",Arial,sans-serif;font-size:10.5pt;line-height:1.32;margin:0}
-h1{font-weight:400;font-size:24pt;color:#1F3864;margin:0 0 10pt;padding-bottom:3pt;border-bottom:1px solid #4F81BD}
+@page{size:Letter;margin:0.75in 0.85in}
+body{font-family:Calibri,Carlito,"Helvetica Neue",Arial,sans-serif;font-size:10.5pt;line-height:1.33;margin:0;color:#111}
+h1{font-weight:400;font-size:23pt;color:#1F3864;margin:0 0 8pt;padding-bottom:3pt;border-bottom:1px solid #4F81BD}
 h2{font-size:13pt;color:#4F81BD;margin:14pt 0 3pt;page-break-after:avoid}
-p{margin:0 0 8pt} ul{margin:0 0 8pt;padding-left:18pt} li{margin-bottom:2pt}
-img{width:92%;display:block;margin:4pt auto 2pt;page-break-inside:avoid} img.half{width:56%;display:block;margin:4pt auto 2pt}
-.cap{font-size:9pt;color:#444;margin-bottom:8pt}
-table{border-collapse:collapse;width:100%;margin:4pt 0 8pt;font-size:9.5pt;page-break-inside:avoid}
-th,td{border:1px solid #888;padding:2pt 5pt;text-align:right} th{background:#DCE6F2} td:first-child,th:first-child{text-align:left}
-.box{border:1px solid #4F81BD;background:#F2F6FB;padding:6pt 9pt;margin:6pt 0 9pt}
-.gl td,.gl th{text-align:left}
+h3{font-size:11pt;color:#1F3864;margin:10pt 0 2pt;page-break-after:avoid}
+p{margin:0 0 7pt} ul{margin:0 0 7pt;padding-left:18pt} li{margin-bottom:2pt}
+figure{margin:6pt 0 9pt;page-break-inside:avoid}
+figure img{display:block;margin:0 auto;max-width:88%}
+figure img.small{max-width:70%}
+figcaption{font-size:9pt;color:#333;margin-top:3pt;line-height:1.3}
+figcaption b{color:#1F3864}
+table{border-collapse:collapse;width:100%;margin:4pt 0 8pt;font-size:9.3pt;page-break-inside:avoid}
+th,td{border:1px solid #999;padding:2pt 5pt;text-align:right} th{background:#DCE6F2} td:first-child,th:first-child{text-align:left}
+.box{border:1px solid #4F81BD;background:#F2F6FB;padding:6pt 10pt;margin:6pt 0 9pt}
+.small{font-size:9pt;color:#444}
+.raw{color:#1f77b4;font-weight:bold}.lc{color:#d96b00;font-weight:bold}.text{color:#8e44ad;font-weight:bold}.best{color:#2e7d32;font-weight:bold}
 </style></head><body>
-<h1>How accurate is HyperLogLog?</h1>
+<h1>When does linear counting stop helping HyperLogLog?</h1>
 <p>Ibrahim and Nika · Advanced Algorithms &amp; Data Structures, Fall 2026 · project report</p>
 
-<h2>1. Summary</h2>
-<div class="box"><ul style="margin:0">
-<li><b>Large counts:</b> the error is about 0.8% for 16,384 registers, as the theory (1.04/√m) says, and it does not depend on how many items we count.</li>
-<li><b>Small counts:</b> the basic formula is far too high (1,000 items: 12 times too big). <b>Linear counting</b> fixes this (error −0.05%).</li>
-<li><b>Surprise:</b> between about 41,000 and 74,000 items, both versions are too high by up to 2.4%, because we switch to linear counting too early.</li>
-<li><b>Cost:</b> HyperLogLog needs 12 KB for any count. An exact hash set needs 345 MB for 10 million items and is 8 to 170 times slower.</li>
-<li>A real text (War and Peace) gives the same picture.</li></ul></div>
+<div class="box">
+<p><b>Goal.</b> At what number of distinct items n does plain HyperLogLog (HLL) become accurate enough that linear counting (LC) no longer helps, and below which is HLL + linear counting better? We measure the border as a ratio <b>c* = n*/m</b> (items per register, m = 2<sup>p</sup>), test whether one value works for every sketch size, and compare the best switch rule that uses only what the sketch can observe with the textbook rule “use LC when the raw estimate E ≤ 2.5·m”.</p>
+<p style="margin:0"><b>Result.</b> The crossover is not a constant. It grows from c* = 2.09 at p = 8 to 3.46 at p = 16, with 95% confidence intervals of about ±0.05 to ±0.09, so the hypothesis “one fixed threshold ≈ 2.5 fits every size” is rejected. Switching at c(p)·m with c(p) = 1.53 + 0.1325·p, measured on runs not used to fit it, gives the following:</p>
+<ul style="margin:3pt 0 0">
+<li>p = 8: no gain, because the textbook rule is already best there.</li>
+<li>p = 14: the worst-case error falls from 2.71% to 1.21% and the hand-over bump from 2.48% to 0.56%.</li>
+<li>p = 16: the worst case falls to 0.24 times the textbook value.</li>
+</ul>
+</div>
 
-<h2>2. The idea in short</h2>
-<p>HyperLogLog (HLL) counts how many <em>different</em> items are in a stream. It does not store the items. It keeps m small counters called <b>registers</b> (m = 2<sup>p</sup>). Each item is turned into a random 64-bit number (a hash). The first p bits say which register to use. In the other bits we count the zeros at the start: a long run of zeros is rare, so if some register has seen a long run, many different items must have passed by.</p>
-<img src="../results/fig_how.png">
-<p>From the registers we compute an estimate. Example with 16 registers:</p>
-<img src="../results/fig_example.png"><div class="cap">The same 16 registers give two answers. The basic formula says 23.2, linear counting says 33.3.</div>
-<p><b>Linear counting</b> is the fix for small counts. When many registers are still empty, we can estimate the count directly from the share of empty registers: m · ln(m / empty). We use it when the basic estimate is at most 2.5m and at least one register is empty. This only changes the last step, not how items are added.</p>
+<h2>1. Background in one paragraph</h2>
+<p>HLL keeps m registers. Each item is hashed, the first p bits choose a register, and the register keeps the longest run of leading zeros seen. The <span class="raw">plain HLL</span> estimate E is computed from the register values and is far too high when most registers are still empty (an empty sketch already says 0.72·m). <span class="lc">Linear counting</span> instead counts the empty registers V and estimates m·ln(m/V); it is accurate while many registers are empty. Implementations switch between the two with a <span class="text">textbook rule</span>: use LC if E ≤ 2.5·m and V &gt; 0. The constant 2.5 is used without justification, and it is the same for every sketch size. That is what we test.</p>
 
-<h2>3. What we did</h2>
+<h2>2. Why we measure in items per register (n / m)</h2>
+<p>m is the number of registers, the sketch's memory slots. n/m is the average number of distinct items per register, so it says how full the sketch is. Both estimators care about how full the sketch is, not about the absolute n. Two sketches of very different size at the same n/m look the same (Figure 1), so if one switch rule could work for every size, it would be a rule in n/m. Example: for p = 14 (m = 16,384), n/m = 2 means n = 32,768 items.</p>
+<figure><img class="small" src="../results/schem_same_ratio.png">
+<figcaption><b>Figure 1 (illustration, simulated).</b> Two sketches fed twice as many random items as they have registers (n/m = 2): 1,024 registers with 2,048 items (left) and 16,384 registers with 32,768 items (right). Each pixel is one register; blue = used, white = still empty. Both have about 87% of their registers used. That is why we put n/m, not n, on the x-axis.</figcaption></figure>
+
+<h2>3. Method</h2>
 <ul>
-<li>We wrote HLL from scratch in C++, with the hash XXH3-64. One sketch gives both estimates (basic and with linear counting).</li>
-<li>Inputs: random 64-bit IDs with repeats, so the real count is known exactly. Every point is repeated with 20 random seeds.</li>
-<li>Error = (estimate − real count) / real count. We report the mean and the spread (standard deviation) over the 20 seeds.</li>
-<li>Tests: counts 0, 1, 2; register edge cases; merging two sketches equals one sketch of all items; a hand-computed example; the switch rules of linear counting; invalid inputs; and the bias near 2.5m. They cover 100% of lines, functions and branches of the HLL and generator code (<code style="font-family:inherit">make coverage</code>). A separate check shows the hash is uniform (10<sup>6</sup> random and 10<sup>6</sup> sequential keys).</li></ul>
+<li><b>Inputs.</b> Random 64-bit IDs with repeats from our generator, so the true count n is known exactly; XXH3-64 hash with a different seed per run. Real-text check: the words of <i>War and Peace</i> in their real order, with the distinct count measured exactly with a hash set.</li>
+<li><b>Grid.</b> p = 8, 10, 12, 14, 16. For each p, 93 values of n/m from 0.25 to 8 (step 0.125 up to 1.5, 0.05 between 1.5 and 5, 0.25 from 5 to 8). 500 runs per point, 200 hash seeds for the real text. For each run one stream feeds one sketch, and we record E and V at every grid point, so all methods see identical sketches.</li>
+<li><b>Error.</b> The error of one estimate is (estimate − n)/n. The <b>typical error</b> at a grid point is the root-mean-square of this over the runs.</li>
+<li><b>Crossover c*.</b> The smallest n/m after which plain HLL's typical error stays at or below LC's for every larger n/m, interpolated linearly between grid points. 95% CI by bootstrap over runs (1,000 resamples).</li>
+<li><b>Switch rules.</b> <code>estimate_switch(c)</code> uses LC if E ≤ c·m and V &gt; 0, else E. c = 2.5 is the textbook rule (our unchanged <code>estimate_lc()</code>).
+  <ul>
+  <li><b>Worst case:</b> the largest typical error anywhere on n/m = 0.25…8.</li>
+  <li><b>Hand-over bump:</b> the largest average error (bias) on that range; for a switch rule it sits at the switch.</li>
+  <li>The best threshold c is chosen on the odd-numbered runs and all comparisons are measured on the 250 even-numbered runs, so the improvement is not inflated by the choice.</li>
+  </ul></li>
+</ul>
 
-<h2>4. Experiment 1: error vs real count (p = 14)</h2>
-<img src="../results/fig_small.png"><div class="cap">The black line is the perfect answer. Left: basic HLL cannot go below about 12,000, even for 10 items. Right: linear counting lies exactly on the perfect line.</div>
-<img src="../results/exp1_p14.png"><div class="cap">Bars in (a): 95% confidence interval of the mean over 20 seeds. (b): spread of the error. (c): share of empty registers; it follows the theory line. The dotted vertical line is the switch point 2.5m = 40,960 items: to the left of it the linear-counting version uses linear counting, to the right it uses the basic formula (so the two versions are identical there).</div>
+<h2>4. Results</h2>
+<h3>4.1 The crossover for one sketch size (p = 14)</h3>
+<figure><img src="../results/exp5_plotA_p14_crossover.png">
+<figcaption><b>Figure 2 (plot A).</b> Typical error (log scale) against items per register n/m (log scale; the top axis shows the same position in items for p = 14) for <span class="raw">plain HLL</span> and <span class="lc">linear counting</span>, 500 runs per point. Shaded bands around the lines are 95% confidence intervals. The dashed line is the crossover: c* = 3.12 (95% CI 3.08–3.18), about 51,200 items. To the left LC is better, to the right plain HLL is better. At 0.25 items per register plain HLL is 239% off while LC is 0.57% off; at 8 items per register LC is 6.4% off and plain HLL 0.79%.</figcaption></figure>
+
+<h3>4.2 Why the crossover happens</h3>
+<figure><img src="../results/exp5_plotE_empty_share.png">
+<figcaption><b>Figure 3 (plot E).</b> Share of registers that are still empty against items per register (p = 14). Dots are measured, the dashed line is the formula e<sup>−n/m</sup>; they agree. At the crossover only 4.4% of the registers are still empty. LC estimates from the empty registers, so when almost none are left its error grows quickly, and plain HLL takes over.</figcaption></figure>
+
+<h3>4.3 Does the crossover depend on the sketch size? Yes</h3>
+<figure><img src="../results/exp5_plotA_all_p.png">
+<figcaption><b>Figure 4 (plot A, all sizes).</b> The same curves for p = 8 … 16 (one thin pair per size, darker = larger sketch; blue plain HLL, orange LC), with the crossovers marked as dots. Left: x-axis = number of items n; the crossovers lie between 535 and 226,521 items. Right: x-axis = items per register n/m; the crossovers lie between 2.1 and 3.5. Using n/m removes most of the size dependence, but not all of it.</figcaption></figure>
+<figure><img src="../results/exp5_plotB_crossover_vs_p.png">
+<figcaption><b>Figure 5 (plot B).</b> Crossover c* against sketch size; bars are 95% bootstrap CIs; the purple dashed line is the textbook value 2.5. If one rule fitted every size, the dots would lie on a horizontal line. They climb by about 0.17 per extra bit of p and the intervals do not overlap, so the hypothesis of one fixed crossover is rejected. 2.5 is close only around p = 10.</figcaption></figure>
+<table><tr><th>p</th><th>m</th><th>c*</th><th>95% CI</th><th>n* (items)</th><th>simple model</th></tr>
+<tr><td>8</td><td>256</td><td>2.09</td><td>2.00–2.17</td><td>535</td><td>2.33</td></tr>
+<tr><td>10</td><td>1,024</td><td>2.45</td><td>2.39–2.50</td><td>2,512</td><td>2.54</td></tr>
+<tr><td>12</td><td>4,096</td><td>2.80</td><td>2.74–2.85</td><td>11,459</td><td>2.89</td></tr>
+<tr><td>14</td><td>16,384</td><td>3.12</td><td>3.08–3.18</td><td>51,200</td><td>3.18</td></tr>
+<tr><td>16</td><td>65,536</td><td>3.46</td><td>3.40–3.51</td><td>226,521</td><td>3.46</td></tr></table>
+<p><b>Explanation.</b> Plain HLL's average over-estimate at a given n/m hardly depends on m: +5.5% at n/m = 2 and +2.4% at n/m = 2.5 for every p ≥ 10. LC's random error shrinks like 1/√m. A bigger sketch therefore keeps LC better for longer. A simple model built from this reproduces c* within 0.09 for p ≥ 10 (0.24 off at p = 8; last column). In the model, plain HLL's typical error² is the measured bias² plus its noise², and LC's typical error² is (e<sup>t</sup> − t − 1)/(t²m) at t = n/m.</p>
+
+<h3>4.4 The best switch rule and its impact</h3>
+<p>A real rule cannot use n, only E, V and m. We therefore scan the threshold c in “use LC while E ≤ c·m”.</p>
+<figure><img src="../results/exp5_plotD_threshold_scan.png">
+<figcaption><b>Figure 6 (plot D).</b> Worst-case error, the largest typical error anywhere on n/m = 0.25…8, against the switch threshold c (p = 14, the 250 odd-numbered runs used for choosing). Each point is a different place to switch, and lower is better. The <span class="text">textbook 2.5</span> lies on the steep part of the curve; the <span class="best">lowest point</span> is at c = 3.45. Switching much too early (left edge) leaves the large small-count error of plain HLL.</figcaption></figure>
+<figure><img src="../results/exp5_bump_definition.png">
+<figcaption><b>Figure 7 (the two measures).</b> Error of the textbook rule at p = 14 against items per register. Solid line: typical error; its tallest point is the <b>worst case</b>. Dotted line: average error (bias); its tallest point is the <b>hand-over bump</b>, the extra over-estimate right where the estimator switches from LC to plain HLL at 2.5.</figcaption></figure>
+<figure><img src="../results/exp5_plotC_rules.png">
+<figcaption><b>Figure 8 (plot C).</b> Worst case and hand-over bump at p = 14 for <span class="raw">plain HLL only</span>, the <span class="text">textbook rule</span> (2.5) and the <span class="best">best rule</span> (3.45), measured on the 250 even-numbered runs that were not used to choose the threshold. Black bars are 95% bootstrap CIs. The best rule cuts the worst case from 2.71% to 1.26% and the bump from 2.48% to 0.50%. Plain HLL alone is 239% off at 0.25 items per register, so it is drawn cut off.</figcaption></figure>
+<figure><img src="../results/exp5_plotC_by_p.png">
+<figcaption><b>Figure 9.</b> Worst-case error of the <span class="text">textbook rule</span> and the <span class="best">best rule</span> for every sketch size (test half, 95% CIs). The gain grows with the sketch size: none at p = 8, large at p = 14 and p = 16.</figcaption></figure>
+<table><tr><th>p</th><th>rule</th><th>switch c</th><th>worst case (95% CI)</th><th>hand-over bump (95% CI)</th><th>worst case ÷ textbook (95% CI)</th></tr>
+<tr><td>8</td><td>textbook / best</td><td>2.50</td><td>7.21% (6.80–7.77)</td><td>1.84% (1.24–2.54)</td><td>1.00</td></tr>
+<tr><td>8</td><td>formula c(p)</td><td>2.59</td><td>7.05% (6.69–7.65)</td><td>1.72% (1.10–2.40)</td><td>0.98 (0.96–1.01)</td></tr>
+<tr><td>10</td><td>textbook</td><td>2.50</td><td>4.11% (3.88–4.36)</td><td>2.18% (1.83–2.50)</td><td>–</td></tr>
+<tr><td>10</td><td>formula c(p)</td><td>2.86</td><td>3.92% (3.58–4.26)</td><td>1.02% (0.70–1.41)</td><td>0.96 (0.88–1.03)</td></tr>
+<tr><td>12</td><td>textbook</td><td>2.50</td><td>2.93% (2.77–3.07)</td><td>2.30% (2.12–2.47)</td><td>–</td></tr>
+<tr><td>12</td><td>formula c(p)</td><td>3.12</td><td>2.16% (1.98–2.33)</td><td>0.71% (0.54–0.87)</td><td>0.74 (0.68–0.79)</td></tr>
+<tr><td>14</td><td>textbook</td><td>2.50</td><td>2.71% (2.61–2.79)</td><td>2.48% (2.39–2.55)</td><td>–</td></tr>
+<tr><td>14</td><td>formula c(p)</td><td>3.38</td><td>1.21% (1.13–1.34)</td><td>0.56% (0.46–0.66)</td><td>0.45 (0.42–0.49)</td></tr>
+<tr><td>16</td><td>textbook</td><td>2.50</td><td>2.65% (2.61–2.69)</td><td>2.60% (2.53–2.66)</td><td>–</td></tr>
+<tr><td>16</td><td>formula c(p)</td><td>3.65</td><td>0.62% (0.58–0.68)</td><td>0.28% (0.23–0.32)</td><td>0.24 (0.22–0.26)</td></tr></table>
+<p>For practice we fitted one line to the best thresholds (training runs only): <b>c(p) = 1.53 + 0.1325·p</b>. On the test runs it is as good as choosing c separately for each p (overlapping CIs; per-p values in <code>results/exp5_rules.csv</code>). The gain is significant from p = 12 upward. At p = 10 only the bump improves, and at p = 8 nothing changes. A rule on the share of empty registers (use LC while V/m &gt; f) performs about as well as the threshold rule.</p>
+
+<h3>4.5 Sanity checks</h3>
+<figure><img src="../results/exp5_sanity.png">
+<figcaption><b>Figure 10.</b> Left: typical error of plain HLL at 8 items per register (blue, measured over 500 runs) against the theory value 1.04/√m (gray). The measured values are 0.91–0.98 times the theory, for example 0.79% against 0.81% at p = 14. Right: crossover on random IDs (black squares) against the crossover on <i>War and Peace</i> (orange, 95% CI over 200 hash seeds). The two agree at p = 10 (2.48 vs 2.45) and p = 12 (2.77 vs 2.80). At p = 8 the real-text interval is wide (1.92–5.55), because one fixed text gives a noisy small sketch. Larger p is not possible: the text has only 17,445 distinct words.</figcaption></figure>
+
+<h2>5. Conclusion and limits</h2>
+<p>Linear counting stops helping at c* = 2.09 to 3.46 items per register, and the border moves to the right as the sketch grows. The textbook constant 2.5 is therefore right only for small sketches. Switching at c(p)·m, with c(p) = 1.53 + 0.1325·p, is a drop-in change of one constant. For p ≥ 12 it removes 26% to 76% of the worst-case error and most of the hand-over bump. Limits:</p>
 <ul>
-<li><b>Small counts.</b> At 1,000 items basic HLL gives about 12,300 (+1130%), as predicted. With linear counting: −0.05% mean, spread 0.56%.</li>
-<li><b>Large counts.</b> From 10<sup>6</sup> items the mean error is within ±0.25% of zero and the spread is 0.64–0.93%, around the theory 0.81%, with no trend in n.</li>
-<li><b>Empty registers</b> follow e<sup>−n/m</sup> almost exactly, which is why linear counting works.</li></ul>
-<h2>5. The surprise: the hand-over region</h2>
-<img src="../results/fig_handover.png"><div class="cap">n/m is the real count divided by the number of registers. The switch to linear counting is at n/m = 2.5 (n = 40,960).</div>
-<table><tr><th>n / m</th><th>2.19</th><th>2.50</th><th>2.81</th><th>3.12</th><th>3.75</th><th>4.38</th><th>5.00</th></tr>
-<tr><td>basic error (%)</td><td>+4.04</td><td>+2.41</td><td>+1.49</td><td>+1.00</td><td>+0.34</td><td>+0.12</td><td>+0.03</td></tr>
-<tr><td>with linear counting (%)</td><td>−0.13</td><td>+2.41</td><td>+1.49</td><td>+1.00</td><td>+0.34</td><td>+0.12</td><td>+0.03</td></tr></table>
-<p><b>Explanation.</b> The basic formula is a little too high in this range. The switch to linear counting looks at the <em>estimate</em>, not at the real count. Because the estimate is too high, it passes 2.5m while the real count is still about 2.5m. At n/m = 2.19 linear counting is used in all 20 runs; at 2.50 in none. So linear counting is turned off while the basic formula is still +2.4% too high, which is about three times the normal noise. Just before the switch, linear counting is accurate. We describe this effect but do not try to correct it. A test in our test suite checks that this bias really exists (p = 12: +2.3% at n = 2.5m).</p>
+<li>We used random IDs and one real text, one hash function, p = 8…16, and the range n/m = 0.25…8.</li>
+<li>Results outside these settings may differ.</li>
+<li>Our code stores 1 byte per register (16 KB at p = 14); the 12 KB figure is for packed 6-bit registers.</li>
+</ul>
+<p>Future work: derive c(m) from theory and test other hashes and real streams.</p>
 
-<h2>6. Experiment 2: error vs number of registers (n = 10<sup>6</sup>)</h2>
-<img src="../results/exp2_n1e6.png"><div class="cap">Bars in (a): 95% confidence interval of the spread (20 seeds).</div>
-<table><tr><th>p</th><th>4</th><th>6</th><th>8</th><th>10</th><th>12</th><th>14</th><th>16</th></tr>
-<tr><td>measured spread (%)</td><td>22.8</td><td>8.28</td><td>7.30</td><td>3.20</td><td>1.65</td><td>0.87</td><td>0.39</td></tr>
-<tr><td>theory 1.04/√m (%)</td><td>26.0</td><td>13.0</td><td>6.50</td><td>3.25</td><td>1.63</td><td>0.81</td><td>0.41</td></tr>
-<tr><td>mean error (%)</td><td>−3.5</td><td>−4.5</td><td>−0.65</td><td>−0.53</td><td>−0.12</td><td>−0.12</td><td>−0.02</td></tr>
-<tr><td>memory, 6-bit (KB)</td><td>0.01</td><td>0.05</td><td>0.19</td><td>0.75</td><td>3.0</td><td>12</td><td>48</td></tr></table>
-<p>The measured spread follows 1.04/√m, and the theory value is inside the 95% interval for every p. Each extra bit of p doubles the memory and lowers the error by a factor √2. Very small sketches (m ≤ 64) also underestimate by 3.5–5.6%, so the theory value is only a rough guide for them.</p>
-
-<h2>7. Experiment 3: time and memory (p = 14)</h2>
-<img src="../results/exp3_p14.png"><div class="cap">Median of 21 timed runs, bars = quartiles. Keys are built before timing, after a warm-up, and every result is used.</div>
-<img src="../results/fig_summary.png" class="half">
-<table><tr><th>real count n</th><th>HLL ns/item</th><th>hash set ns/item</th><th>hash set memory</th><th>HLL memory (stored / 6-bit)</th></tr>
-<tr><td>1,000</td><td>1.4</td><td>23.3</td><td>37 KB</td><td>16 KB / 12 KB</td></tr>
-<tr><td>100,000</td><td>3.6</td><td>37.4</td><td>3.2 MB</td><td>16 KB / 12 KB</td></tr>
-<tr><td>10<sup>6</sup></td><td>1.7</td><td>94</td><td>37 MB</td><td>16 KB / 12 KB</td></tr>
-<tr><td>10<sup>7</sup></td><td>1.2</td><td>208</td><td>345 MB</td><td>16 KB / 12 KB</td></tr></table>
-<ul>
-<li>HLL is 8 to 170 times faster per item. The hash set slows down as it grows; HLL memory stays constant.</li>
-<li><b>Linear counting does not slow it down:</b> adding items is the same code. Computing the estimate takes about 28 µs for both versions; linear counting adds about 1 µs at 1,000 items and nothing at larger counts. (The linear-counting curve in the first plot includes one estimate, so it is higher for few items.)</li>
-<li>HLL gets faster per item for large n (3.6 ns at 10<sup>5</sup>, 1.2 ns at 10<sup>7</sup>). Probably almost no register changes late in the stream, so the update is easy to predict; we did not test this.</li>
-<li>Hash set memory is the exact number of bytes the allocator was asked for.</li></ul>
-
-<h2>8. Real data: distinct words in War and Peace</h2>
-<p>583,368 words, 17,445 different (counted exactly with a hash set). Public text from Project Gutenberg. The word order is fixed; the 20 seeds change only the hash.</p>
-<img src="../results/fig_real.png">
-<table><tr><th>p</th><th>m</th><th>n/m</th><th>basic mean error</th><th>LC mean error</th><th>LC spread</th><th>theory</th></tr>
-<tr><td>10</td><td>1024</td><td>17.0</td><td>+0.58%</td><td>+0.58%</td><td>3.13%</td><td>3.25%</td></tr>
-<tr><td>12</td><td>4096</td><td>4.26</td><td>+0.08%</td><td>+0.08%</td><td>1.44%</td><td>1.62%</td></tr>
-<tr><td>13</td><td>8192</td><td>2.13</td><td>+4.21%</td><td>−0.50%</td><td>1.14%</td><td>1.15%</td></tr>
-<tr><td>14</td><td>16384</td><td>1.06</td><td>+27.85%</td><td>−0.18%</td><td>0.72%</td><td>0.81%</td></tr></table>
-<p>Same two effects as before: when n/m is small, basic HLL is too high (+28% at p = 14) and linear counting fixes it; when n/m is large, both match 1.04/√m.</p>
-
-<h2>9. Answers, and corrections to our seminar slides</h2>
-<ul>
-<li><b>Question 1.</b> The error is about 0.8% (p = 14) for any count above about 4.5m. Below 2.5m basic HLL is far off, and linear counting fixes it. A small bump of up to +2.4% remains between 2.5m and 4.5m.</li>
-<li><b>Question 2.</b> The spread follows 1.04/√m for all p from 4 to 16.</li>
-<li><b>Memory.</b> 16,384 registers × 6 bits = <b>12 KB</b>, not 1.5 KB (1.5 KB would be only 2,048 registers). Our code stores one whole byte per register, so 16 KB.</li>
-<li><b>Typical error.</b> <b>0.81%</b> for p = 14, not about 2% (2% belongs to p = 11: 1.04/√2048 = 2.3%).</li>
-<li><b>Slide 10 example.</b> We did not have the seminar slides, so the test uses our own hand-computed example (the 16 registers above: basic 23.16, linear counting 33.27). Replace its numbers if the slide differs.</li></ul>
-
-<h2>10. Limits</h2>
-<ul>
-<li>20 seeds: the spread values are uncertain by about ±16%.</li>
-<li>Points of Experiment 1 at different n share one stream per seed, so they are not independent.</li>
-<li>Timings come from one laptop, plugged in with other programs closed. An earlier run on battery gave nearly the same values. The ratios matter more than the exact nanoseconds.</li>
-<li>We use a 64-bit hash, so no correction for huge counts is needed. We did not try to correct the small bias in the hand-over region.</li></ul>
-<p style="font-size:9pt;color:#444">Code, data and all CSVs are in the project folder (README.md, results/FINDINGS.md).</p>
+<h2>6. Supporting experiments (first phase)</h2>
+<p class="small">These answer the earlier, broader questions. They still hold and are summarized in <code>results/FINDINGS.md</code>, section 2.</p>
+<figure><img src="../results/exp1_p14.png">
+<figcaption><b>Figure 11 (experiment 1, p = 14, 20 runs).</b> (a) Mean relative error and (b) spread of the error against the true count n for basic HLL and the textbook HLL + LC. (c) Share of empty registers. Error bars are 95% CIs of the mean. At 1,000 items basic HLL is +1130% off (12.3 times too big), while HLL + LC is −0.05% off. From 10<sup>6</sup> items both have a spread of 0.64–0.93%, around the theory 0.81%. The jump right of the dotted switch line is the hand-over bump studied above.</figcaption></figure>
+<figure><img class="small" src="../results/exp5_backup_theory.png">
+<figcaption><b>Figure 12 (experiment 2, n = 10<sup>6</sup>, 20 runs).</b> Typical error of plain HLL against p, with the theory 1.04/√m as a dashed line. They agree for p = 4…16. Correction to our seminar slides: the typical error at p = 14 is 0.81%, not about 2% (2% belongs to p = 11).</figcaption></figure>
+<figure><img class="small" src="../results/fig_summary.png">
+<figcaption><b>Figure 13 (experiment 3, p = 14, 10 million items, median of 21 timed runs).</b> HLL needs 12 KB with packed 6-bit registers (16 KB as our code stores it) and 1.2 ns per item. An exact <code>std::unordered_set</code> needs 345 MB and 208 ns per item. Across n = 10<sup>3</sup>…10<sup>7</sup> HLL is 8 to 170 times faster. Linear counting adds no time to updates, and the estimate step costs about 28 µs for both versions. Correction to our seminar slides: 16,384 registers × 6 bits = 12 KB, not 1.5 KB.</figcaption></figure>
+<p><b>Experiment 4</b> (full <i>War and Peace</i> text, 583,368 words, 17,445 distinct, 20 hash seeds) gives the same picture as random IDs. At p = 14 (n/m = 1.06) basic HLL is +27.85% off and HLL + LC −0.18% (spread 0.72%, theory 0.81%). For p ≤ 12 both agree with 1.04/√m (<code>results/exp4_real.csv</code>).</p>
+<p class="small">The slide-10 test uses our own hand-computed example (16 registers, basic estimate 23.16, linear counting 33.27), because the seminar slide's numbers were not available. Code, data and CSVs are in the repository. The commands are in README.md.</p>
 </body></html>

@@ -15,19 +15,22 @@ th,td{border:1px solid #888;padding:3pt 5pt;vertical-align:top;text-align:left}
 th{background:#DCE6F2}
 </style></head><body>
 <h1>Project Proposal: HyperLogLog</h1>
-<p>Ibrahim and Nika · Advanced Algorithms &amp; Data Structures, Fall 2026 · 20 October 2026</p>
+<p>Ibrahim and Nika · Advanced Algorithms &amp; Data Structures, Fall 2026 · 20 October 2026, updated 19 November 2026</p>
+<p style="border:1px solid #4F81BD;background:#F2F6FB;padding:5pt 8pt"><b>Update after feedback (19 November).</b> The first plan (sections 2–4, experiments 1–3) is done. Following the feedback that our goal was too broad, the project now has one main question, shown in section 2. Two new experiments, 5 and 6, answer it. Experiments 1–4 stay as supporting material.</p>
 
 <h2>1. Team and topic</h2>
 <p>We are Ibrahim and Nika, and our topic is HyperLogLog, the algorithm from our student seminar. It estimates how many different items are in a huge stream while using only a few kilobytes of memory. In this project we want to test how accurate it really is, and where it stops being accurate.</p>
 
-<h2>2. Idea and research questions</h2>
-<p>In the seminar we saw that HyperLogLog is very good for large counts, but that the basic version has trouble with small ones. We would like to see this ourselves and find out whether the fix is worth it.</p>
-<p>Our research questions:</p>
-<ol>
-<li>How does the error of HyperLogLog change with the true number of distinct items, and does linear counting (the small-count fix) remove the error for small counts?</li>
-<li>How does the number of registers change the error, compared with the theory value 1.04/√m?</li>
-</ol>
-<h3>What we expect</h3>
+<h2>2. Idea and research question</h2>
+<p>In the seminar we saw that HyperLogLog is very good for large counts, but that the basic version has trouble with small ones; linear counting is the fix. Implementations switch from linear counting to plain HyperLogLog with a fixed rule: use linear counting when the raw estimate E is at most 2.5·m and some register is empty. Nobody explains the 2.5, and it is the same for every sketch size.</p>
+<p><b>Main question:</b> at what number of distinct items n does plain HyperLogLog become accurate enough that linear counting no longer helps, and below which is HyperLogLog + linear counting better?</p>
+<ul>
+<li>We express the border as a ratio <b>c* = n*/m</b> (items per register, m = 2<sup>p</sup>). The crossover n* is the smallest n after which plain HyperLogLog's error stays at or below linear counting's.</li>
+<li><b>Hypothesis:</b> one fixed c*, about 2.5, works for every p, because both estimators depend on how full the sketch is (n/m), not on n itself.</li>
+<li><b>Impact we will measure:</b> a switch rule may only use what the sketch can observe (E and the number of empty registers). We find the best such threshold. Against the textbook 2.5 rule, we report how much it reduces (a) the worst-case error over the whole range of n and (b) the error bump at the hand-over. If 2.5 turns out to be (nearly) optimal, that is the finding.</li>
+</ul>
+<p>Supporting questions from the first phase: how the error changes with n, and how the number of registers changes the error compared with the theory value 1.04/√m.</p>
+<h3>What we expect (first phase)</h3>
 <p>For large counts, the theory says the standard error is about 1.04/√m, where m is the number of registers. For 16,384 registers that is 0.81%. We expect to measure roughly this, and it should not depend on how many items we count.</p>
 <p>For small counts we expect trouble. With 16,384 registers and only 1,000 items, almost every register is still empty, so the basic formula should give about 0.72 · 16,384 ≈ 11,800. That is around 12 times too big. Linear counting looks at how many registers are empty instead, and we expect it to be off by only about 1%.</p>
 <p>Linear counting only changes the last step, not the update, so we do not expect it to make the algorithm slower.</p>
@@ -37,7 +40,7 @@ th{background:#DCE6F2}
 <h2>3. Implementation</h2>
 <p>We will write HyperLogLog ourselves, because we need to see the registers and count the empty ones. We write it in C++, because we both know it well and the leading-zero count is a single built-in instruction there.</p>
 <ul>
-<li>Two versions in the same code: the basic estimator, and the basic estimator with linear counting when the estimate is at most 2.5m and some registers are empty.</li>
+<li>Two versions in the same code: the basic estimator, and the basic estimator with linear counting when the estimate is at most 2.5m and some registers are empty. For the main question we add pure linear counting and a switch rule with a configurable threshold, without changing the default.</li>
 <li>A 64-bit hash from an existing library: we use XXH3-64 from xxHash (header-only). The first p bits choose the register, the rest give the leading zeros.</li>
 <li>The number of registers is 2<sup>p</sup>. We use p = 14 by default and try p from 4 to 16.</li>
 <li>Small tests to be sure it works: the example from slide 10, a count of 0, 1 and 2 items, and a check that merging two sketches gives the same result as one sketch of all items.</li>
@@ -57,9 +60,12 @@ th{background:#DCE6F2}
 <tr><td>1</td><td>True count n</td><td>Basic HLL, HLL with linear counting</td><td>p = 14</td><td>Mean relative error and its spread</td></tr>
 <tr><td>2</td><td>Number of registers (p)</td><td>Measured error, theory 1.04/√m</td><td>n = 10<sup>6</sup></td><td>Spread of the error, and memory</td></tr>
 <tr><td>3</td><td>True count n</td><td>Basic HLL, HLL with linear counting, hash set</td><td>p = 14</td><td>Time per item and memory</td></tr>
+<tr><td>5 (main)</td><td>Items per register n/m, 0.25 to 8</td><td>Plain HLL, linear counting, switch rules (textbook 2.5 and best threshold)</td><td>p = 8, 10, 12, 14, 16</td><td>Crossover c* with 95% CI per p; worst-case error and hand-over bump per rule</td></tr>
+<tr><td>6</td><td>Items per register n/m</td><td>Plain HLL, linear counting</td><td>Real text, p = 8, 10, 12</td><td>Crossover on real data vs random IDs</td></tr>
 </table>
+<p>In experiment 5 the best threshold is chosen on half of the runs and evaluated on the other half, so the improvement is not inflated by the choice.</p>
 <h3>Randomness and timing</h3>
-<p>Every point is repeated with 20 random seeds, and all versions get the same seeds and inputs. We look at the distribution of the errors first, then report the mean with a 95% confidence interval and say on the plots what the error bars show. For the timing in experiment 3 we use a small benchmark harness of our own (Google Benchmark is not installed and we do not want to spend time on setting it up). It does a warm-up run, repeats each measurement several times and reports the median and the spread; we build the keys outside the measured code, and we use every result so the compiler cannot remove the work. All runs are on one machine that is plugged in, with other programs closed.</p>
+<p>Every point of experiments 1–4 is repeated with 20 random seeds; experiment 5 uses 500 runs per point (20 are too few to locate a crossover) and experiment 6 uses 200 hash seeds. All versions get the same seeds and inputs. We look at the distribution of the errors first, then report the mean with a 95% confidence interval and say on the plots what the error bars show. For the timing in experiment 3 we use a small benchmark harness of our own (Google Benchmark is not installed and we do not want to spend time on setting it up). It does a warm-up run, repeats each measurement several times and reports the median and the spread; we build the keys outside the measured code, and we use every result so the compiler cannot remove the work. All runs are on one machine that is plugged in, with other programs closed.</p>
 
 <h2>5. Schedule</h2>
 <p>We have four weeks between the proposal and the defense. After the review we update this proposal within a few days.</p>
@@ -69,6 +75,7 @@ th{background:#DCE6F2}
 <tr><td>2</td><td>Timing setup for experiment 3</td><td>Experiments 1 and 2</td><td>First plots</td></tr>
 <tr><td>3</td><td>Experiment 3, memory</td><td>Compare results with our predictions</td><td>All main plots, list of surprises</td></tr>
 <tr><td>4</td><td>Real dataset if we are on time</td><td>Report and slides together</td><td>Ready for the defense</td></tr>
+<tr><td>after feedback</td><td>Crossover on real text (exp. 6)</td><td>Crossover experiment and switch rule (exp. 5)</td><td>Main result; report and slides rebuilt around it</td></tr>
 </table>
 <p>If we fall behind, the real dataset is the first thing we drop.</p>
 
@@ -77,6 +84,6 @@ th{background:#DCE6F2}
 <li><b>Language and benchmark tool:</b> C++ and our own small timing harness (see sections 3 and 4).</li>
 <li><b>Hash library:</b> XXH3-64 from xxHash. It looked uniform on 10<sup>6</sup> random keys and also on 10<sup>6</sup> sequential keys (chi-square of the register buckets, distribution of the leading zeros, and balance of all 64 bits).</li>
 <li><b>Real dataset:</b> optional, one public word list as described in section 4; skipped if there is no time.</li>
-<li><b>Number of seeds:</b> 20. A first test run gave a spread of 0.79% at large counts against 0.81% in theory, so the intervals are narrow enough. We only add seeds if the intervals in the final plots turn out too wide.</li>
+<li><b>Number of seeds:</b> 20 for experiments 1–4 (a first test run gave a spread of 0.79% at large counts against 0.81% in theory); 500 for the crossover experiment, because locating a crossover between two noisy curves needs many more runs than measuring one error.</li>
 </ul>
 </body></html>
