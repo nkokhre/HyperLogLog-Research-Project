@@ -13,7 +13,7 @@ from matplotlib.ticker import FixedLocator, FixedFormatter, NullLocator
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RES = os.path.join(ROOT, "results")
 RAW, LC, TEXT, BEST, INK, GRAYC = "#1f77b4", "#ff7f0e", "#8e44ad", "#2e7d32", "#222222", "#777777"
-plt.rcParams.update({"font.size": 15, "axes.spines.top": False, "axes.spines.right": False, "lines.linewidth": 3.2, "savefig.dpi": 200})
+plt.rcParams.update({"font.size": 17, "axes.spines.top": False, "axes.spines.right": False, "lines.linewidth": 3.2, "savefig.dpi": 200})
 
 
 def save(fig, name):
@@ -41,7 +41,7 @@ save(fig, "schem_question.png")
 
 # ---- slide 6: a sketch filling up (simulated balls into registers) ----
 rng = np.random.default_rng(7)
-fig, axs = plt.subplots(1, 3, figsize=(13, 4.6))
+fig, axs = plt.subplots(1, 3, figsize=(10.5, 4.4))
 M = 64
 for ax, t in zip(axs, (0.5, 2, 6)):
     n = int(t * M); hit = np.zeros(M, bool); hit[rng.integers(0, M, n)] = True
@@ -51,12 +51,12 @@ for ax, t in zip(axs, (0.5, 2, 6)):
         ax.axhline(i - 0.5, color="#999999", lw=1); ax.axvline(i - 0.5, color="#999999", lw=1)
     ax.set_xticks([]); ax.set_yticks([])
     for sp in ax.spines.values(): sp.set_visible(True)
-    ax.set_title(f"n / m = {t:g}\n{hit.mean() * 100:.0f}% of registers used", fontsize=17, fontweight="bold")
-fig.text(0.5, -0.04, "Illustration: 64 registers (squares); every item lands in a random register; blue = used, white = still empty", ha="center", fontsize=14, color=GRAYC)
+    ax.set_title(f"n / m = {t:g}\n{hit.mean() * 100:.0f}% used", fontsize=20, fontweight="bold")
+fig.text(0.5, -0.04, "Illustration: 64 registers; each item lands in a random register.\nBlue = used, white = still empty.", ha="center", fontsize=15, color=GRAYC)
 save(fig, "schem_filling.png")
 
 # ---- slide 7: same n/m, same picture (simulated) ----
-fig, axs = plt.subplots(1, 2, figsize=(12, 5.8))
+fig, axs = plt.subplots(1, 2, figsize=(9.5, 5.6))
 for ax, (m, side) in zip(axs, ((1024, 32), (16384, 128))):
     n = 2 * m; hit = np.zeros(m, bool); hit[rng.integers(0, m, n)] = True
     ax.imshow(hit.reshape(side, side), cmap=matplotlib.colors.ListedColormap(["#ffffff", RAW]), interpolation="nearest")
@@ -78,7 +78,7 @@ ax.text(5.1, 0.45, "off by 300 = 3% of 10,000", ha="center", fontsize=18, fontwe
 save(fig, "schem_error.png")
 
 # ---- slide 10: how to read the next graph (illustration) ----
-fig, ax = plt.subplots(figsize=(10.5, 5.6))
+fig, ax = plt.subplots(figsize=(9.5, 5.4))
 x = np.linspace(0, 1, 100)
 ax.plot(x, 0.9 - 0.8 * x ** 0.7, color=RAW); ax.plot(x, 0.15 + 0.7 * x ** 1.8, color=LC)
 ax.text(0.04, 0.82, "Method A", color=RAW, fontsize=22, fontweight="bold"); ax.text(0.72, 0.9, "Method B", color=LC, fontsize=22, fontweight="bold")
@@ -89,8 +89,8 @@ ax.annotate("lines cross: the border", xy=(0.52, 0.5), xytext=(0.42, 0.12), font
 save(fig, "schem_two_curves.png")
 
 # ---- slide 14: what we would see if one rule fits all sizes (illustration) ----
-fig, axs = plt.subplots(1, 2, figsize=(13, 4.8), sharey=True)
-rows = (0.78, 0.5, 0.22); names = ("small sketch", "medium sketch", "large sketch")
+fig, axs = plt.subplots(1, 2, figsize=(10.5, 5.0), sharey=True)
+rows = (0.78, 0.5, 0.22); names = ("small", "medium", "large")
 for ax, pos, ttl in ((axs[0], [3.0, 3.0, 3.0], "If ONE rule fits every size:\nthe crossovers line up"),
                      (axs[1], [2.1, 3.0, 4.2], "If NOT:\nthe crossovers drift")):
     ax.set_xlim(1, 6); ax.set_ylim(0, 1); ax.set_yticks([]); ax.spines["left"].set_visible(False)
