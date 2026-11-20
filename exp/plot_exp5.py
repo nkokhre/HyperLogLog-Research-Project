@@ -308,8 +308,8 @@ def plot_sanity(fname):
     save(fig, fname)
 
 
-# ---------------------------------------------------------------- backup plots
-def plot_backup_theory(fname):
+# ---------------------------------------------------------------- supporting plot (used in the report)
+def plot_theory_check(fname):
     """typical error of plain HLL vs number of registers (exp2 data) against the theory line"""
     e2 = pd.read_csv(os.path.join(RES, "exp2_n1e6.csv"))
     n = e2.n.iloc[0]
@@ -331,24 +331,6 @@ def plot_backup_theory(fname):
     save(fig, fname)
 
 
-def plot_small_multiples(fname):
-    ps = sorted(cross.index)
-    fig, axs = plt.subplots(1, len(ps), figsize=WIDE, sharey=True)
-    for a, p in zip(axs, ps):
-        d = curves_p(p)
-        a.plot(d.n_over_m, d.rmse_raw * 100, color=RAW, lw=2.8); a.plot(d.n_over_m, d.rmse_lc * 100, color=LC, lw=2.8)
-        c = cross.loc[p, "c_star"]; a.axvline(c, color=INK, ls="--", lw=2.2)
-        a.set_xscale("log"); a.set_yscale("log"); a.set_xlim(0.25, 8); a.set_ylim(0.15, 400)
-        a.xaxis.set_major_locator(FixedLocator([0.5, 2, 8])); a.xaxis.set_major_formatter(FixedFormatter(["0.5", "2", "8"]))
-        a.xaxis.set_minor_locator(NullLocator()); a.yaxis.set_minor_locator(NullLocator())
-        a.set_title(f"p = {p}\ncrossover {c:.2f}", fontsize=17, fontweight="bold")
-    axs[0].yaxis.set_major_locator(FixedLocator([1, 10, 100])); axs[0].yaxis.set_major_formatter(FixedFormatter(["1%", "10%", "100%"]))
-    axs[0].set_ylabel("Typical error")
-    fig.supxlabel("Items per register (n/m, log scale)", fontsize=18)
-    fig.tight_layout()
-    save(fig, fname)
-
-
 if __name__ == "__main__":
     plot_a_p14(False, "exp5_plotA_p14_plain.png")
     plot_a_p14(True, "exp5_plotA_p14_crossover.png")
@@ -360,6 +342,5 @@ if __name__ == "__main__":
     plot_e("exp5_plotE_empty_share.png")
     plot_bump_definition("exp5_bump_definition.png")
     plot_sanity("exp5_sanity.png")
-    plot_backup_theory("exp5_backup_theory.png")
-    plot_small_multiples("exp5_backup_small_multiples.png")
+    plot_theory_check("exp5_theory_check.png")
     print("exp5 plots written")

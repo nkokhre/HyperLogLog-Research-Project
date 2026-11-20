@@ -1,10 +1,12 @@
-"""Builds slides.html (the defense deck): 23 main slides + 4 backup slides.
+"""Builds slides.html (the defense deck): 23 slides.
 
 Run from the project root:   python3 report/make_slides.py      (needs pandas)
 Open slides.html in a browser (or VS Code: right-click -> "Open with Live Server").
-Keys: -> / space = next, <- = back, Home / End, N = speaker notes, P = print view (one page per slide).
+Keys: -> / space = next, <- = back, Home / End, P = print view (one page per slide).
 
-Every number on a slide is read from results/*.csv at build time; the source file is written in the notes.
+Every number on a slide is read from results/*.csv at build time. The speaker notes (walkthrough of every graph)
+and the source file of every number are kept below as the notes= and source= arguments of add(); they are
+for the presenter and are not written into slides.html.
 Colour code (same in every plot and slide): plain HLL = blue, linear counting = orange,
 textbook 2.5 rule = purple, best rule = green.
 """
@@ -324,113 +326,101 @@ add("Takeaway", f"Conclusion: the border is not a constant; it moves from {cs[8]
 
 assert len(SLIDES) == MAIN_SLIDES, len(SLIDES)
 
-# ================================================================== BACKUP
-add("Backup", "Backup: plain HLL's error follows 1.04/√m for every sketch size",
-    graph("exp5_backup_theory.png", "measured error vs p against theory",
-          ["Measured error tracks the theory line", "Theory: 0.81% at p = 14, not about 2% as on our seminar slides"],
-          "x-axis = p (sketch size), y-axis = typical error of plain HLL (log scale). Blue = measured, gray dashed = theory 1.04/√m. 20 runs per point. Look for: do the points follow the line?"),
-    "(1) The x-axis is p, so the sketch size doubles with every step. (2) The y-axis is the typical error of plain HLL for one million items, log scale. "
-    "(3) Blue dots are measured, the gray dashed line is the theory 1.04 over the square root of m. (4) They agree within the noise of 20 runs. "
-    "(5) Correction to our seminar slides: the typical error at p = 14 is 0.81 percent, not about 2 percent; 2 percent would be p = 11.",
-    "results/exp2_n1e6.csv; plot: exp/plot_exp5.py (plot_backup_theory)")
-
-add("Backup", f"Backup: HLL needs 12 KB and about {exp3.hll_basic_ns:.1f} ns per item; an exact hash set needs {exp3.set_bytes / 1e6:.0f} MB and {exp3.set_ns:.0f} ns",
-    graph("fig_summary.png", "memory and time: HLL vs hash set",
-          ["12 KB packed 6-bit (16 KB as our code stores it), not 1.5 KB", "Linear counting adds no time to updates"],
-          "left = memory (log scale), right = time per item. Green = HyperLogLog (p = 14), gray = exact hash set, both for 10 million items. Look for: the size of the gap."),
-    "(1) The two panels compare memory and time for ten million items. (2) Left is memory on a log scale, right is time per item. (3) Green is HyperLogLog at p = 14, gray is an exact hash set. "
-    f"(4) HLL uses 12 KB when registers are packed to 6 bits (our code stores one byte per register, so 16 KB), against {exp3.set_bytes / 1e6:.0f} MB for the hash set. "
-    "(5) Correction to our seminar slides: 16,384 registers times 6 bits is 12 KB, not 1.5 KB.",
-    "results/exp3_p14.csv; plot: exp/plot_extra.py")
-
-add("Backup", "Backup: full experiment setup",
-    ul(["Data: random 64-bit IDs with repeats (true count known) and the words of War and Peace; hash XXH3-64, a different seed per run",
-        "Estimators: plain HLL, pure linear counting m·ln(m/V) with V ≥ 1, switch rules on E ≤ c·m or on the empty share",
-        "Crossover c* = smallest n/m after which plain HLL's typical error stays ≤ LC's; 95% CI by bootstrap over runs (1,000 resamples)",
-        "Best switch place chosen on half of the runs, evaluated on the other half",
-        "Worst case = largest typical error on n/m = 0.25 … 8; hand-over bump = largest average error on that range"], "small"),
-    "Reference slide for questions. Everything here is also in the README and in exp/analyze_exp5.py.",
-    "README.md, exp/analyze_exp5.py")
-
-add("Backup", "Backup: the crossover for each sketch size",
-    graph("exp5_backup_small_multiples.png", "one panel per sketch size", None,
-          "each panel = one sketch size. x-axis = items per register, y-axis = typical error. Blue = plain HLL, orange = linear counting, dashed line = crossover (value in the panel title). Look for: the dashed line moves right as p grows.", wide=True),
-    "(1) x-axis: items per register, log scale, in all five panels. (2) y-axis: typical error, log scale. (3) Blue is plain HLL, orange is linear counting, the dashed line is the crossover. "
-    "(4) The left part of the blue line is the same in every panel, because it is dominated by the built-in over-estimate, while the orange line moves down as the sketch gets bigger. "
-    "(5) That is why the crossover moves to the right.",
-    "results/exp5_curves.csv, results/exp5_crossover.csv")
-
 # ------------------------------------------------------------------ HTML
-CSS = """
-:root{--navy:#1F3864;--blue:#4F81BD;--ink:#222;--gray:#666;--raw:#1f77b4;--lc:#ff7f0e;--text:#8e44ad;--best:#2e7d32;--red:#c0392b}
+CSS = r"""
+:root{--navy:#1F3864;--navy2:#14264a;--blue:#4F81BD;--sky:#8fb4ee;--ink:#1f2937;--gray:#5b6577;
+--raw:#1f77b4;--lc:#ff7f0e;--text:#8e44ad;--best:#2e7d32;--red:#c0392b;--line:#e1e8f5}
 *{box-sizing:border-box}
-html,body{margin:0;height:100%;background:#2b2b2b;font-family:Calibri,Carlito,"Segoe UI","Helvetica Neue",Arial,sans-serif;color:var(--ink)}
+html,body{margin:0;height:100%;overflow:hidden;font-family:Calibri,Carlito,"Segoe UI",system-ui,"Helvetica Neue",Arial,sans-serif;color:var(--ink);
+background:radial-gradient(circle at 18% 12%,#38579a 0,transparent 42%),radial-gradient(circle at 85% 90%,#2a4377 0,transparent 40%),#1b2845;
+-webkit-print-color-adjust:exact;print-color-adjust:exact}
+#progress{position:fixed;left:0;top:0;width:100%;height:5px;background:rgba(255,255,255,.12);z-index:9}
+#progress i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--blue),var(--sky));transition:width .35s ease}
 #deck{position:absolute;left:50%;top:50%;width:1280px;height:720px;transform-origin:center center}
-.slide{position:absolute;inset:0;width:1280px;height:720px;background:#fff;padding:22px 52px 0;display:none;flex-direction:column;overflow:hidden}
-.slide.on{display:flex}
-h2{margin:0;height:84px;display:flex;align-items:center;font-size:31px;line-height:1.15;color:var(--navy);font-weight:700}
+.slide{position:absolute;inset:0;width:1280px;height:720px;padding:26px 56px 0;display:none;flex-direction:column;overflow:hidden;border-radius:8px;
+background-color:#fff;
+background-image:radial-gradient(circle at 1px 1px,rgba(31,56,100,.075) 1.2px,transparent 0),linear-gradient(180deg,#f2f6fd 0%,#ffffff 34%);
+background-size:28px 28px,100% 100%;box-shadow:0 24px 70px rgba(0,0,0,.5)}
+.slide.on{display:flex;animation:rise .45s ease both}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.slide::before{content:"";position:absolute;left:0;top:0;right:0;height:9px;background:linear-gradient(90deg,var(--navy2),var(--blue) 70%,var(--sky))}
+.slide::after{content:"";position:absolute;right:34px;top:22px;width:141px;height:57px;background:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='141' height='57' viewBox='0 0 141 57'%3E%3Crect x='0' y='0' width='15' height='15' rx='4' fill='%234F81BD'/%3E%3Crect x='21' y='0' width='15' height='15' rx='4' fill='%23dbe6f7'/%3E%3Crect x='42' y='0' width='15' height='15' rx='4' fill='%23dbe6f7'/%3E%3Crect x='63' y='0' width='15' height='15' rx='4' fill='%234F81BD'/%3E%3Crect x='84' y='0' width='15' height='15' rx='4' fill='%234F81BD'/%3E%3Crect x='105' y='0' width='15' height='15' rx='4' fill='%23dbe6f7'/%3E%3Crect x='126' y='0' width='15' height='15' rx='4' fill='%234F81BD'/%3E%3Crect x='0' y='21' width='15' height='15' rx='4' fill='%234F81BD'/%3E%3Crect x='21' y='21' width='15' height='15' rx='4' fill='%23dbe6f7'/%3E%3Crect x='42' y='21' width='15' height='15' rx='4' fill='%23dbe6f7'/%3E%3Crect x='63' y='21' width='15' height='15' rx='4' fill='%234F81BD'/%3E%3Crect x='84' y='21' width='15' height='15' rx='4' fill='%234F81BD'/%3E%3Crect x='105' y='21' width='15' height='15' rx='4' fill='%234F81BD'/%3E%3Crect x='126' y='21' width='15' height='15' rx='4' fill='%23dbe6f7'/%3E%3Crect x='0' y='42' width='15' height='15' rx='4' fill='%23dbe6f7'/%3E%3Crect x='21' y='42' width='15' height='15' rx='4' fill='%234F81BD'/%3E%3Crect x='42' y='42' width='15' height='15' rx='4' fill='%23dbe6f7'/%3E%3Crect x='63' y='42' width='15' height='15' rx='4' fill='%23dbe6f7'/%3E%3Crect x='84' y='42' width='15' height='15' rx='4' fill='%23dbe6f7'/%3E%3Crect x='105' y='42' width='15' height='15' rx='4' fill='%23dbe6f7'/%3E%3Crect x='126' y='42' width='15' height='15' rx='4' fill='%234F81BD'/%3E%3C/svg%3E") no-repeat;opacity:.55;pointer-events:none}
+.slide>*{position:relative;z-index:1}
+h2{margin:0;height:84px;display:flex;align-items:center;font-size:31px;line-height:1.15;color:var(--navy);font-weight:800;letter-spacing:-.2px;
+padding-left:24px;padding-right:150px;position:relative;margin-top:6px}
+h2::before{content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);width:8px;height:58px;border-radius:5px;background:linear-gradient(180deg,var(--sky),var(--navy))}
 h2.s{font-size:27px} h2.xs{font-size:24px}
-.rule{height:4px;background:var(--blue);margin:4px 0 16px;flex:none}
+.rule{height:3px;border-radius:3px;background:linear-gradient(90deg,var(--blue),rgba(79,129,189,.05));margin:4px 0 18px;flex:none}
 .content{flex:1;display:flex;flex-direction:column;min-height:0}
-ul{margin:6px 0;padding-left:28px} li{font-size:23px;line-height:1.3;margin:0 0 14px} li::marker{color:var(--blue)}
+ul{list-style:none;margin:6px 0;padding-left:0}
+li{position:relative;font-size:23px;line-height:1.3;margin:0 0 14px;padding-left:32px}
+li::before{content:"";position:absolute;left:4px;top:.5em;width:12px;height:12px;border-radius:3px;background:linear-gradient(135deg,var(--sky),var(--navy));transform:rotate(45deg)}
 .small li{font-size:20px;margin-bottom:12px}
-.bigl li{font-size:28px;margin-bottom:20px}
+.bigl li{font-size:28px;margin-bottom:20px;padding-left:38px} .bigl li::before{width:15px;height:15px;top:.48em}
 .concl li{font-size:26px}
-.graph{display:flex;gap:24px;flex:1;min-height:0}
+.graph{display:flex;gap:26px;flex:1;min-height:0}
 .pic{flex:0 0 820px;display:flex;align-items:flex-start;justify-content:center}
-.side{flex:1} .side li{font-size:20px;margin-bottom:16px}
+.side{flex:1;align-self:flex-start;background:rgba(255,255,255,.92);border:1px solid var(--line);border-radius:16px;padding:14px 16px 4px;box-shadow:0 8px 24px rgba(31,56,100,.1)}
+.side li{font-size:20px;margin-bottom:14px;padding-left:28px} .side li::before{width:10px;height:10px}
 .wide{flex:1;display:flex;justify-content:center;min-height:0}
-img.plot{max-width:100%;max-height:452px;object-fit:contain}
-.wide img.plot{max-height:458px}
-img.mid{max-height:360px}
-.how{flex:none;margin:8px 0 0;background:#EAF1FB;border:1.5px solid var(--blue);border-radius:10px;padding:9px 16px;font-size:16.5px;line-height:1.3;min-height:58px;display:flex;align-items:center}
-.how b{color:var(--navy);margin-right:6px;white-space:nowrap}
-.footer{flex:none;height:44px;display:flex;align-items:center;justify-content:space-between;font-size:14px;color:#aaa;margin-top:auto}
-.footer .cur{color:var(--navy);font-weight:700;font-size:15px} .footer .sep{color:#ccc;margin:0 8px}
-.footer .num{color:var(--gray)}
+img.plot{max-width:100%;max-height:438px;object-fit:contain;background:#fff;border:1px solid var(--line);border-radius:16px;padding:10px;box-shadow:0 10px 30px rgba(31,56,100,.14)}
+.wide img.plot{max-height:444px}
+img.mid{max-height:350px}
+.how{flex:none;margin:8px 0 0;background:linear-gradient(90deg,#e6effc,#f7faff);border:0;border-left:7px solid var(--blue);border-radius:12px;padding:9px 18px;font-size:16.5px;line-height:1.3;min-height:58px;display:flex;align-items:center;box-shadow:0 5px 16px rgba(31,56,100,.1)}
+.how b{color:var(--navy);margin-right:6px;white-space:nowrap;text-transform:uppercase;font-size:14px;letter-spacing:.6px}
+.footer{flex:none;height:46px;display:flex;align-items:center;justify-content:space-between;font-size:14px;color:#9aa7bf;margin-top:auto}
+.footer .cur{background:var(--navy);color:#fff;padding:3px 14px;border-radius:99px;font-weight:700;font-size:14px}
+.footer .sep{color:#c3cde0;margin:0 7px}
+.footer .num{background:#eaf0fb;color:#4a5b82;padding:3px 14px;border-radius:99px;font-weight:600}
 .center{display:flex;justify-content:center} p.center{text-align:center;display:block}
 .note{font-size:21px;color:var(--gray);margin:16px 0}
-.callout{font-size:28px;color:var(--navy);font-weight:700;text-align:center;margin:18px 0}
+.callout{font-size:28px;color:var(--navy);font-weight:800;text-align:center;margin:20px auto;width:fit-content;max-width:100%;background:linear-gradient(90deg,#e6effc,#f4f8ff);padding:12px 32px;border-radius:99px;box-shadow:0 6px 18px rgba(31,56,100,.1)}
 b.raw{color:var(--raw)} b.lc{color:var(--lc)} b.text{color:var(--text)} b.best{color:var(--best)} b.red{color:var(--red)} b.navy{color:var(--navy)}
 h3{margin:0 0 12px;font-size:30px} h3.navy{color:var(--navy);font-size:27px}
 .cards{display:flex;gap:40px;margin-top:20px}
-.card{flex:1;border:3px solid;border-radius:14px;padding:20px 26px;font-size:23px;line-height:1.4}
-.card p{margin:0} .card.raw{border-color:var(--raw)} .card.raw h3{color:var(--raw)} .card.lc{border-color:var(--lc)} .card.lc h3{color:var(--lc)}
-.card.hyp{background:#FFF4E5;font-size:27px;flex:0 0 520px}
+.card{flex:1;border:3px solid;border-radius:20px;padding:22px 28px;font-size:23px;line-height:1.4;background:#fff;box-shadow:0 14px 34px rgba(31,56,100,.13)}
+.card p{margin:0}
+.card.raw{border-color:var(--raw);background:linear-gradient(180deg,#eef6fc,#fff 70%)} .card.raw h3{color:var(--raw)}
+.card.lc{border-color:var(--lc);background:linear-gradient(180deg,#fff4e8,#fff 70%)} .card.lc h3{color:var(--lc)}
+.card.hyp{font-size:27px;flex:0 0 520px}
 .two{display:flex;gap:40px;margin-top:10px} .two>div:first-child{flex:1}
-.rulebox{margin:30px auto 30px;padding:28px 40px;border:3px solid var(--text);background:#F3E8F8;border-radius:14px;font-size:38px;font-weight:700;color:var(--text);text-align:center;width:900px}
+.rulebox{margin:30px auto 30px;padding:28px 40px;border:3px solid var(--text);background:linear-gradient(180deg,#f6ecfb,#fff);border-radius:20px;font-size:38px;font-weight:800;color:var(--text);text-align:center;width:900px;box-shadow:0 14px 34px rgba(142,68,173,.18)}
 .tiles{display:flex;gap:30px;margin-top:30px}
-.tile{flex:1;border:2.5px solid var(--blue);background:#EAF1FB;border-radius:14px;padding:30px 14px;text-align:center}
-.tb{font-size:36px;font-weight:700;color:var(--navy);margin-bottom:14px} .ts{font-size:21px;line-height:1.35}
-.titlepage{flex:1;display:flex;flex-direction:column;justify-content:center;padding-left:30px}
-h1.big{font-size:52px;color:var(--navy);margin:0 0 24px;line-height:1.1}
-.sub{font-size:27px;color:var(--gray);margin:0 0 34px} .who{font-size:20px;color:var(--gray);margin:0}
-.notes{display:none}
-#notes{position:fixed;left:0;right:0;bottom:0;max-height:34vh;overflow:auto;background:#fffbe6;border-top:3px solid #e0c060;padding:12px 22px;font-size:17px;line-height:1.4;display:none;z-index:9}
-#notes.on{display:block} #notes .src{color:#777;font-size:14px;margin-top:6px}
-#hint{position:fixed;right:12px;bottom:8px;color:#bbb;font-size:12px}
+.tile{flex:1;border:0;border-top:7px solid var(--blue);background:linear-gradient(180deg,#eef4fd,#fff);border-radius:18px;padding:30px 14px;text-align:center;box-shadow:0 14px 32px rgba(31,56,100,.13)}
+.tb{font-size:36px;font-weight:800;color:var(--navy);margin-bottom:14px} .ts{font-size:21px;line-height:1.35}
+.titlepage{flex:1;display:flex;flex-direction:column;justify-content:center;padding-left:34px;max-width:700px}
+h1.big{font-size:52px;color:var(--navy);margin:0 0 24px;line-height:1.08;font-weight:800;letter-spacing:-.5px}
+.sub{font-size:25px;color:var(--gray);margin:0 0 34px} .who{font-size:20px;color:var(--gray);margin:0}
+/* title slide: dark hero with a grid of registers filling up */
+#s1{background-image:radial-gradient(circle at 80% 24%,rgba(143,180,238,.28),transparent 46%),linear-gradient(135deg,#0f1d3a 0%,#1F3864 48%,#2f5da8 100%);background-size:100% 100%}
+#s1::before{height:12px;background:linear-gradient(90deg,var(--sky),#fff 50%,var(--sky));opacity:.55}
+#s1::after{right:64px;top:120px;width:376px;height:376px;background:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='376' height='376' viewBox='0 0 376 376'%3E%3Crect x='0' y='0' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='35' y='0' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='70' y='0' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='105' y='0' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='140' y='0' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='175' y='0' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='210' y='0' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='245' y='0' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='280' y='0' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='315' y='0' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='350' y='0' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='0' y='35' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='35' y='35' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='70' y='35' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='105' y='35' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='140' y='35' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='175' y='35' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='210' y='35' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='245' y='35' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='280' y='35' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='315' y='35' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='350' y='35' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='0' y='70' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='35' y='70' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='70' y='70' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='105' y='70' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='140' y='70' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='175' y='70' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='210' y='70' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='245' y='70' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='280' y='70' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='315' y='70' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='350' y='70' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='0' y='105' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='35' y='105' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='70' y='105' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='105' y='105' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='140' y='105' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='175' y='105' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='210' y='105' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='245' y='105' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='280' y='105' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='315' y='105' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='350' y='105' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='0' y='140' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='35' y='140' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='70' y='140' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='105' y='140' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='140' y='140' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='175' y='140' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='210' y='140' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='245' y='140' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='280' y='140' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='315' y='140' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='350' y='140' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='0' y='175' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='35' y='175' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='70' y='175' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='105' y='175' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='140' y='175' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='175' y='175' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='210' y='175' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='245' y='175' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='280' y='175' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='315' y='175' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='350' y='175' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='0' y='210' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='35' y='210' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='70' y='210' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='105' y='210' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='140' y='210' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='175' y='210' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='210' y='210' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='245' y='210' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='280' y='210' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='315' y='210' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='350' y='210' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='0' y='245' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='35' y='245' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='70' y='245' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='105' y='245' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='140' y='245' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='175' y='245' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='210' y='245' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='245' y='245' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='280' y='245' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='315' y='245' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='350' y='245' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='0' y='280' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='35' y='280' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='70' y='280' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='105' y='280' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='140' y='280' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='175' y='280' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='210' y='280' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='245' y='280' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='280' y='280' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='315' y='280' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='350' y='280' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='0' y='315' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='35' y='315' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='70' y='315' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='105' y='315' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='140' y='315' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='175' y='315' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='210' y='315' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='245' y='315' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='280' y='315' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='315' y='315' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='350' y='315' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='0' y='350' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='35' y='350' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='70' y='350' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='105' y='350' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='140' y='350' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='175' y='350' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='210' y='350' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='245' y='350' width='26' height='26' rx='4' fill='rgba(255,255,255,0.10)' stroke='rgba(255,255,255,0.22)' stroke-width='1.5'/%3E%3Crect x='280' y='350' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='315' y='350' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3Crect x='350' y='350' width='26' height='26' rx='4' fill='%236fa3e8'/%3E%3C/svg%3E") no-repeat;opacity:1}
+#s1 h1.big{color:#fff} #s1 .sub{color:rgba(255,255,255,.86)} #s1 .who{color:rgba(255,255,255,.7)}
+#s1 .titlepage::before{content:"";width:92px;height:7px;border-radius:4px;background:linear-gradient(90deg,var(--sky),#fff);margin-bottom:30px}
+#s1 .footer{color:rgba(255,255,255,.55)} #s1 .footer .cur{background:rgba(255,255,255,.95);color:var(--navy)} #s1 .footer .sep{color:rgba(255,255,255,.35)} #s1 .footer .num{background:rgba(255,255,255,.16);color:#fff}
+#hint{position:fixed;left:50%;bottom:8px;transform:translateX(-50%);color:#d5e0f5;font-size:13px;background:rgba(0,0,0,.35);padding:4px 14px;border-radius:99px;animation:hintfade 7s ease forwards;pointer-events:none}
+@keyframes hintfade{0%,70%{opacity:1}100%{opacity:0}}
 @media print{
   @page{size:1280px 720px;margin:0}
-  html,body{background:#fff;height:auto}
+  html,body{background:#fff;height:auto;overflow:visible}
   #deck{position:static;transform:none!important;width:auto;height:auto}
-  .slide{display:flex!important;position:relative;page-break-after:always;break-after:page}
-  #notes,#hint{display:none!important}
+  .slide{display:flex!important;position:relative;page-break-after:always;break-after:page;box-shadow:none;border-radius:0;animation:none}
+  #hint,#progress{display:none!important}
 }
-body.print{background:#fff} body.print #deck{position:static;transform:none!important;width:auto;height:auto}
-body.print .slide{display:flex;position:relative;margin:0 auto 20px;box-shadow:0 0 0 1px #ccc}
+body.print{overflow:auto;background:#cfd6e4} body.print #deck{position:static;transform:none!important;width:auto;height:auto}
+body.print .slide{display:flex;position:relative;margin:0 auto 24px}
 """
 
-JS = """
+JS = r"""
 const S=[...document.querySelectorAll('.slide')];let i=0;
-const deck=document.getElementById('deck'),notes=document.getElementById('notes');
-function fit(){if(document.body.classList.contains('print'))return;const k=Math.min(innerWidth/1280,innerHeight/720);deck.style.transform=`translate(-50%,-50%) scale(${k})`;}
+const deck=document.getElementById('deck'),bar=document.querySelector('#progress i');
+function fit(){if(document.body.classList.contains('print'))return;const k=Math.min(innerWidth/1280,innerHeight/720)*0.97;deck.style.transform=`translate(-50%,-50%) scale(${k})`;}
 function show(n){i=Math.max(0,Math.min(S.length-1,n));S.forEach((s,k)=>s.classList.toggle('on',k===i));
-  const a=S[i].querySelector('.notes');notes.innerHTML=a?a.innerHTML:'';history.replaceState(null,'','#'+(i+1));}
+  bar.style.width=((i+1)/S.length*100)+'%';history.replaceState(null,'','#'+(i+1));}
 addEventListener('keydown',e=>{const k=e.key;
   if(['ArrowRight','PageDown',' ','Enter'].includes(k)){show(i+1);e.preventDefault();}
   else if(['ArrowLeft','PageUp','Backspace'].includes(k)){show(i-1);e.preventDefault();}
   else if(k==='Home')show(0);else if(k==='End')show(S.length-1);
-  else if(k==='n'||k==='N')notes.classList.toggle('on');
   else if(k==='p'||k==='P'){document.body.classList.toggle('print');if(!document.body.classList.contains('print'))fit();else deck.style.transform='none';}});
 deck.addEventListener('click',e=>{if(e.clientX>innerWidth/2)show(i+1);else show(i-1);});
 addEventListener('resize',fit);fit();show((parseInt(location.hash.slice(1))||1)-1);
@@ -438,12 +428,9 @@ addEventListener('resize',fit);fit();show((parseInt(location.hash.slice(1))||1)-
 
 
 def footer(section, num):
-    if section == "Backup":
-        secs = '<span class="cur">Backup</span>'
-    else:
-        parts = [f'<span class="{"cur" if s == section else ""}">{s}</span>' for s in SECTIONS]
-        secs = '<span class="sep">›</span>'.join(parts)
-    return f'<div class="footer"><div>{secs}</div><div class="num">{num} / {MAIN_SLIDES}{" (backup)" if section == "Backup" else ""}</div></div>'
+    parts = [f'<span class="{"cur" if s == section else ""}">{s}</span>' for s in SECTIONS]
+    secs = '<span class="sep">›</span>'.join(parts)
+    return f'<div class="footer"><div>{secs}</div><div class="num">{num} / {MAIN_SLIDES}</div></div>'
 
 
 def title_cls(t):
@@ -452,17 +439,16 @@ def title_cls(t):
 
 out = []
 for k, s in enumerate(SLIDES, 1):
-    note = E(s["notes"]) + (f'<div class="src">Source: {E(s["source"])}</div>' if s["source"] else "")
     if k == 1:
         inner = s["body"]
     else:
         inner = f'<h2 class="{title_cls(s["title"])}">{E(s["title"])}</h2><div class="rule"></div><div class="content">{s["body"]}</div>'
-    out.append(f'<section class="slide" id="s{k}">{inner}{footer(s["section"], k)}<aside class="notes">{note}</aside></section>')
+    out.append(f'<section class="slide" id="s{k}">{inner}{footer(s["section"], k)}</section>')
 
 page = (f'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
         f'<title>When does linear counting stop helping HyperLogLog?</title><style>{CSS}</style></head><body>'
-        f'<div id="deck">{"".join(out)}</div><div id="notes"></div>'
-        f'<div id="hint">→ / ← move · N notes · P print view</div><script>{JS}</script></body></html>')
+        f'<div id="deck">{"".join(out)}</div><div id="progress"><i></i></div>'
+        f'<div id="hint">→ / ← move · P print view</div><script>{JS}</script></body></html>')
 with open(os.path.join(ROOT, "slides.html"), "w", encoding="utf-8") as f:
     f.write(page)
-print(f"saved slides.html: {len(SLIDES)} slides ({MAIN_SLIDES} main + {len(SLIDES) - MAIN_SLIDES} backup)")
+print(f"saved slides.html: {len(SLIDES)} slides")

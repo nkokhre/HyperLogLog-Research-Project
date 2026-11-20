@@ -35,7 +35,7 @@ Supporting experiments (background, see FINDINGS section 2):
     build/exp4_real data/war_and_peace.txt 20 > results/exp4_real.csv
 
 **Slides:** open `slides.html` in a browser, or in VS Code right-click it and choose "Open with Live Server".
-Keys: → / space next, ← back, **N** speaker notes (with a walkthrough for every graph and the source file of every number), **P** print view.
+Keys: → / space next, ← back, Home / End, **P** print view (one page per slide).
 
 ## Layout
 - `src/hll.hpp`: HyperLogLog. It provides `estimate_basic()` (plain HLL) and `estimate_lc()` (textbook rule, unchanged). It also provides `estimate_lc_only()` (pure LC), `estimate_switch(c)` and `estimate_switch_empty(f)` (switch rules), `merge()`, `empty_fraction()` and `bytes_packed_6bit()`.
@@ -77,6 +77,6 @@ Terms (the same everywhere):
 | Benchmark | own harness (warm-up, 21 repeats, median, keys built outside the timing) |
 
 ## Status
-Done: library, tests (100% coverage of `src/`), all experiments, FINDINGS, report, proposal and slides (23 main + 4 backup).
+Done: library, tests (100% coverage of `src/`), all experiments, FINDINGS, report, proposal and slides (23 slides).
 Limits: random IDs and one text, one hash, p = 8…16, and the n/m grid only goes up to 8. Our code stores 1 byte per register (16 KB at p = 14); the 12 KB figure is for packed 6-bit registers.
 The slide-10 test (`test_worked_example()`) uses our own hand-computed example, because we do not have the original slide's numbers.
