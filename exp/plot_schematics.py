@@ -79,13 +79,19 @@ save(fig, "schem_error.png")
 
 # ---- slide 10: how to read the next graph (illustration) ----
 fig, ax = plt.subplots(figsize=(9.5, 5.4))
-x = np.linspace(0, 1, 100)
-ax.plot(x, 0.9 - 0.8 * x ** 0.7, color=RAW); ax.plot(x, 0.15 + 0.7 * x ** 1.8, color=LC)
+x = np.linspace(0, 1, 500)
+y_a = 0.9 - 0.8 * x ** 0.7
+y_b = 0.15 + 0.7 * x ** 1.8
+idx = np.argmin(np.abs(y_a - y_b))
+xc, yc = x[idx], y_a[idx]
+
+ax.plot(x, y_a, color=RAW); ax.plot(x, y_b, color=LC)
 ax.text(0.04, 0.82, "Method A", color=RAW, fontsize=22, fontweight="bold"); ax.text(0.72, 0.9, "Method B", color=LC, fontsize=22, fontweight="bold")
 ax.set_xticks([]); ax.set_yticks([]); ax.set_xlabel("how full the sketch is  →", fontsize=18); ax.set_ylabel("error  →  (higher = worse)", fontsize=18)
 ax.set_title("Question for every graph:  which line is LOWER, and where?", fontsize=19, fontweight="bold", color=INK, pad=16)
 ax.text(0.99, 0.02, "illustration, not real data", transform=ax.transAxes, ha="right", fontsize=13, color=GRAYC)
-ax.annotate("lines cross: the border", xy=(0.52, 0.5), xytext=(0.42, 0.12), fontsize=17, color=INK, arrowprops=dict(arrowstyle="-|>", color=INK, lw=2.2))
+ax.scatter([xc], [yc], color=INK, s=60, zorder=5)
+ax.annotate("lines cross: the border", xy=(xc, yc), xytext=(0.38, 0.12), fontsize=17, color=INK, arrowprops=dict(arrowstyle="-|>", color=INK, lw=2.2))
 save(fig, "schem_two_curves.png")
 
 # ---- slide 14: what we would see if one rule fits all sizes (illustration) ----
